@@ -8,6 +8,8 @@ from nfe_sync.state import (
     get_cooldown,
     set_cooldown,
     limpar_cooldown,
+    get_ultimo_nsu,
+    set_ultimo_nsu,
 )
 
 
@@ -66,3 +68,20 @@ class TestCooldown:
     def test_limpar_inexistente(self):
         estado = {}
         limpar_cooldown(estado, "123")  # nao deve dar erro
+
+
+class TestNsu:
+    def test_get_inexistente(self):
+        assert get_ultimo_nsu({}, "123") == 0
+
+    def test_set_e_get(self):
+        estado = {}
+        set_ultimo_nsu(estado, "123", 42)
+        assert get_ultimo_nsu(estado, "123") == 42
+
+    def test_multiplos_cnpjs(self):
+        estado = {}
+        set_ultimo_nsu(estado, "111", 10)
+        set_ultimo_nsu(estado, "222", 20)
+        assert get_ultimo_nsu(estado, "111") == 10
+        assert get_ultimo_nsu(estado, "222") == 20

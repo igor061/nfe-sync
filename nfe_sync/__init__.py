@@ -17,6 +17,8 @@ from .state import (
     get_cooldown,
     set_cooldown,
     limpar_cooldown,
+    get_ultimo_nsu,
+    set_ultimo_nsu,
 )
 from .exceptions import NfeConfigError, NfeValidationError
 
@@ -37,6 +39,8 @@ __all__ = [
     "get_cooldown",
     "set_cooldown",
     "limpar_cooldown",
+    "get_ultimo_nsu",
+    "set_ultimo_nsu",
     "NfeConfigError",
     "NfeValidationError",
 ]

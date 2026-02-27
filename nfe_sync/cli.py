@@ -119,6 +119,40 @@ def cmd_consultar(args):
     print(f"  XML salvo em: {resultado['arquivo']}")
 
 
+def cmd_consultar_nsu(args):
+    empresa, estado = _carregar(args)
+    cnpj = empresa.emitente.cnpj
+    nsu = args.nsu
+
+    print(f"Empresa: {empresa.nome} (CNPJ {cnpj})")
+    print(f"Ambiente: {'Homologacao' if empresa.homologacao else 'Producao'}")
+    print(f"Consultando distribuicao DFe (NSU: {nsu if nsu is not None else 'ultimo salvo'})...")
+    print()
+
+    from .consulta import consultar_nsu
+    resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu)
+
+    if not resultado.get("sucesso") and "motivo" in resultado and not resultado.get("status"):
+        print(f"BLOQUEADO: {resultado['motivo']}")
+        sys.exit(1)
+
+    print(f"Status: {resultado.get('status')}")
+    print(f"Motivo: {resultado.get('motivo')}")
+
+    docs = resultado.get("documentos", [])
+    if docs:
+        print(f"Documentos: {len(docs)}")
+        for doc in docs:
+            if "erro" in doc:
+                print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
+            else:
+                print(f"  NSU {doc['nsu']} ({doc['schema']}) — {doc['arquivo']}")
+        print(f"Ultimo NSU: {resultado.get('ultimo_nsu')}")
+        print(f"Max NSU: {resultado.get('max_nsu')}")
+    else:
+        print("Nenhum documento localizado.")
+
+
 def cmd_manifestar(args):
     empresa, estado = _carregar(args)
 
@@ -177,6 +211,12 @@ def cli(argv=None):
     p_consultar.add_argument("empresa", help="Nome da empresa (secao no .ini)")
     p_consultar.add_argument("chave", help="Chave de acesso (44 digitos)")
     p_consultar.set_defaults(func=cmd_consultar)
+
+    # consultar-nsu
+    p_nsu = sub.add_parser("consultar-nsu", help="Consultar distribuicao DFe por NSU")
+    p_nsu.add_argument("empresa", help="Nome da empresa (secao no .ini)")
+    p_nsu.add_argument("--nsu", type=int, default=None, help="NSU inicial (default: ultimo salvo)")
+    p_nsu.set_defaults(func=cmd_consultar_nsu)
 
     # manifestar
     p_manifestar = sub.add_parser("manifestar", help="Manifestar destinatario")

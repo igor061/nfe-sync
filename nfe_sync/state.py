@@ -33,3 +33,11 @@ def set_cooldown(estado: dict, cnpj: str, iso_str: str) -> None:
 def limpar_cooldown(estado: dict, cnpj: str) -> None:
     cooldowns = estado.get("cooldown", {})
     cooldowns.pop(cnpj, None)
+
+
+def get_ultimo_nsu(estado: dict, cnpj: str) -> int:
+    return estado.get("nsu", {}).get(cnpj, 0)
+
+
+def set_ultimo_nsu(estado: dict, cnpj: str, nsu: int) -> None:
+    estado.setdefault("nsu", {})[cnpj] = nsu
