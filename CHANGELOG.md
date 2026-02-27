@@ -1,7 +1,7 @@
 # Changelog
 
 ## 0.2.8
-- corrigir estrutura do CHANGELOG.md: header no topo
+- ajustar help com sintaxe dos comandos e mensagens em portugues
 
 ## 0.2.7
 - adicionar comandos versao e atualizar, CHANGELOG automatico e novidades no check de update
