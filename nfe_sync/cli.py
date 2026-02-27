@@ -201,6 +201,27 @@ def cmd_inutilizar(args):
     print(f"  Resposta salva em: {resultado['arquivo']}")
 
 
+def cmd_api_cnpja(args):
+    from .apis.config import get_api_config
+    from .apis.cnpja import consultar
+
+    config = get_api_config("cnpja")
+    empresa = consultar(args.cnpj, config, simples=args.simples)
+
+    print(f"CNPJ: {empresa.cnpj}")
+    print(f"Razao Social: {empresa.razao_social}")
+    print(f"Nome Fantasia: {empresa.nome_fantasia}")
+    print(f"Data Abertura: {empresa.data_abertura}")
+    print(f"Situacao: {empresa.situacao}")
+    end = empresa.endereco
+    print(f"Endereco: {end.logradouro}, {end.numero} - {end.bairro}")
+    print(f"Municipio: {end.municipio} / {end.uf} - CEP {end.cep}")
+    if empresa.socios:
+        print("Socios:")
+        for s in empresa.socios:
+            print(f"  {s.nome} ({s.tipo}) - {s.qualificacao}")
+
+
 def cli(argv=None):
     parser = argparse.ArgumentParser(prog="nfe-sync", description="NF-e Sync CLI")
     amb = parser.add_mutually_exclusive_group()
@@ -242,6 +263,16 @@ def cli(argv=None):
     p_inutilizar.add_argument("--fim", required=True, type=int, help="Numero final")
     p_inutilizar.add_argument("--justificativa", required=True, help="Justificativa (min 15 chars)")
     p_inutilizar.set_defaults(func=cmd_inutilizar)
+
+    # api
+    p_api = sub.add_parser("api", help="Consultar APIs externas")
+    api_sub = p_api.add_subparsers(dest="api_cmd", required=True)
+
+    # api cnpja
+    p_cnpja = api_sub.add_parser("cnpja", help="Consultar CNPJ via CNPJa")
+    p_cnpja.add_argument("cnpj", help="CNPJ a consultar")
+    p_cnpja.add_argument("--simples", action="store_true", help="Incluir dados do Simples Nacional")
+    p_cnpja.set_defaults(func=cmd_api_cnpja)
 
     args = parser.parse_args(argv)
 

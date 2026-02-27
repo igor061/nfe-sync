@@ -2,7 +2,7 @@
 name = "nfe-sync"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["pynfe>=0.6.5", "python-dotenv", "pydantic>=2.0"]
+dependencies = ["pynfe>=0.6.5", "python-dotenv", "pydantic>=2.0", "requests"]
 
 [project.optional-dependencies]
 dev = ["pytest"]

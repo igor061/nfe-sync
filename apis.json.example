@@ -1,0 +1,8 @@
+{
+  "cnpja": {
+    "base_url": "https://api.cnpja.com",
+    "headers": {
+      "Authorization": "<SUA_API_KEY>"
+    }
+  }
+}
