@@ -13,7 +13,7 @@ dev = ["pytest"]
 
 [project.scripts]
 nfe-sync = "nfe_sync.cli:cli"
-api = "nfe_sync.apis.cli:cli"
+api_cli = "nfe_sync.apis.cli:cli"
 
 [tool.setuptools.packages.find]
 include = ["nfe_sync*"]

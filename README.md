@@ -10,11 +10,11 @@ Biblioteca Python e CLI para emissão, consulta, manifestação e inutilização
 pip install git+https://github.com/seu-usuario/nfe-sync.git
 ```
 
-Os comandos `nfe-sync` e `api` ficam disponíveis diretamente no terminal:
+Os comandos `nfe-sync` e `api_cli` ficam disponíveis diretamente no terminal:
 
 ```bash
 nfe-sync --help
-api --help
+api_cli --help
 ```
 
 ### Modo desenvolvimento (clone do repositório)
@@ -29,7 +29,7 @@ Use os scripts na raiz do projeto, que ativam a virtualenv automaticamente:
 
 ```bash
 ./run_nfesync --help
-./run_api --help
+./run_api_cli --help
 ```
 
 ## Configuração
@@ -55,7 +55,7 @@ razao_social = EMPRESA EXEMPLO LTDA
 
 ## CLI
 
-> Em modo desenvolvimento substitua `nfe-sync` por `./run_nfesync` e `api` por `./run_api`.
+> Em modo desenvolvimento substitua `nfe-sync` por `./run_nfesync` e `api_cli` por `./run_api_cli`.
 
 ### Emitir NF-e
 
@@ -113,14 +113,14 @@ nfe-sync --homologacao emitir MINHAEMPRESA --serie 1
 
 ```bash
 # CNPJá — dados cadastrais, CNAE, sócios, endereço (open.cnpja.com)
-api cnpja 33000167000101
+api_cli cnpja 33000167000101
 
 # Com chave da CNPJá (configure apis.json para remover limite de requisições)
 cp apis.json.example apis.json
-api cnpja 33000167000101
+api_cli cnpja 33000167000101
 
 # publica.cnpj.ws — inclui inscrições estaduais por UF
-api cnpjws 33000167000101
+api_cli cnpjws 33000167000101
 ```
 
 ## Requisitos
