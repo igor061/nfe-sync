@@ -59,6 +59,44 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
     }
 
 
+TIPOS_EVENTO = {
+    "110110": "carta-correcao",
+    "110111": "cancelamento",
+    "110140": "epec",
+    "210200": "confirmacao",
+    "210210": "ciencia",
+    "210220": "desconhecimento",
+    "210240": "nao-realizada",
+    "510630": "registro-passagem",
+    "610600": "cancelamento-substituicao",
+    "610614": "cancelamento-ct",
+    "790700": "averbacao",
+    "990900": "vistoria-suframa",
+    "990910": "internalizacao-suframa",
+}
+
+
+def nome_arquivo_nsu(xml_doc, schema: str, fallback: str) -> tuple[str, str | None]:
+    """Retorna (nome_sem_extensao, chave_ou_None) para um documento NSU."""
+    chaves = xml_doc.xpath("//*[local-name()='chNFe']/text()")
+    if chaves:
+        chave = chaves[0]
+        is_evento = "Evento" in schema or "evento" in schema
+        if is_evento:
+            tp_evento = (xml_doc.xpath("//*[local-name()='tpEvento']/text()") or [""])[0]
+            n_seq = (xml_doc.xpath("//*[local-name()='nSeqEvento']/text()") or ["1"])[0]
+            tipo = TIPOS_EVENTO.get(tp_evento, tp_evento)
+            return f"{chave}-evento-{tipo}-{n_seq}", chave
+        return chave, chave
+
+    cnpj_dest = (xml_doc.xpath("//*[local-name()='dest']/*[local-name()='CNPJ']/text()") or [""])[0]
+    cnpj_emit = (xml_doc.xpath("//*[local-name()='emit']/*[local-name()='CNPJ']/text()") or [""])[0]
+    serie = (xml_doc.xpath("//*[local-name()='ide']/*[local-name()='serie']/text()") or [""])[0]
+    numero = (xml_doc.xpath("//*[local-name()='ide']/*[local-name()='nNF']/text()") or [""])[0]
+    nome = f"{cnpj_dest}-{cnpj_emit}-{serie}-{numero}" if any([cnpj_dest, cnpj_emit, serie, numero]) else fallback
+    return nome, None
+
+
 def _processar_docs(xml_resp, documentos, cnpj: str):
     docs_xml = xml_resp.xpath("//ns:docZip", namespaces=NS)
 
@@ -68,22 +106,14 @@ def _processar_docs(xml_resp, documentos, cnpj: str):
         try:
             xml_doc = DescompactaGzip.descompacta(doc.text)
             xml_str = etree.tostring(xml_doc, encoding="unicode", pretty_print=True)
-            chaves = xml_doc.xpath("//*[local-name()='chNFe']/text()")
-            if chaves:
-                nome = chaves[0]
-            else:
-                cnpj_dest = (xml_doc.xpath("//*[local-name()='dest']/*[local-name()='CNPJ']/text()") or [""])[0]
-                cnpj_emit = (xml_doc.xpath("//*[local-name()='emit']/*[local-name()='CNPJ']/text()") or [""])[0]
-                serie = (xml_doc.xpath("//*[local-name()='ide']/*[local-name()='serie']/text()") or [""])[0]
-                numero = (xml_doc.xpath("//*[local-name()='ide']/*[local-name()='nNF']/text()") or [""])[0]
-                nome = f"{cnpj_dest}-{cnpj_emit}-{serie}-{numero}" if any([cnpj_dest, cnpj_emit, serie, numero]) else doc_nsu
+            nome, chave = nome_arquivo_nsu(xml_doc, schema, doc_nsu)
             arquivo = f"downloads/{cnpj}/{nome}.xml"
             with open(arquivo, "w") as f:
                 f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
                 f.write(xml_str)
             documentos.append({
                 "nsu": doc_nsu,
-                "chave": nome if chaves else None,
+                "chave": chave,
                 "schema": schema,
                 "arquivo": arquivo,
             })
