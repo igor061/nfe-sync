@@ -53,21 +53,36 @@ class TestNumeracao:
 
 class TestCooldown:
     def test_get_inexistente(self):
-        assert get_cooldown({}, "123") is None
+        assert get_cooldown({}, "123", "homologacao") is None
 
     def test_set_e_get(self):
         estado = {}
-        set_cooldown(estado, "123", "2026-02-26T18:37:32")
-        assert get_cooldown(estado, "123") == "2026-02-26T18:37:32"
+        set_cooldown(estado, "123", "2026-02-26T18:37:32", "homologacao")
+        assert get_cooldown(estado, "123", "homologacao") == "2026-02-26T18:37:32"
+
+    def test_ambientes_independentes(self):
+        estado = {}
+        set_cooldown(estado, "123", "2026-02-26T18:00:00", "homologacao")
+        set_cooldown(estado, "123", "2026-02-26T19:00:00", "producao")
+        assert get_cooldown(estado, "123", "homologacao") == "2026-02-26T18:00:00"
+        assert get_cooldown(estado, "123", "producao") == "2026-02-26T19:00:00"
 
     def test_limpar(self):
-        estado = {"cooldown": {"123": "2026-02-26T18:37:32"}}
-        limpar_cooldown(estado, "123")
-        assert get_cooldown(estado, "123") is None
+        estado = {"cooldown": {"123:homologacao": "2026-02-26T18:37:32"}}
+        limpar_cooldown(estado, "123", "homologacao")
+        assert get_cooldown(estado, "123", "homologacao") is None
+
+    def test_limpar_nao_afeta_outro_ambiente(self):
+        estado = {}
+        set_cooldown(estado, "123", "2026-02-26T18:00:00", "homologacao")
+        set_cooldown(estado, "123", "2026-02-26T19:00:00", "producao")
+        limpar_cooldown(estado, "123", "homologacao")
+        assert get_cooldown(estado, "123", "homologacao") is None
+        assert get_cooldown(estado, "123", "producao") == "2026-02-26T19:00:00"
 
     def test_limpar_inexistente(self):
         estado = {}
-        limpar_cooldown(estado, "123")  # nao deve dar erro
+        limpar_cooldown(estado, "123", "homologacao")  # nao deve dar erro
 
 
 class TestNsu:

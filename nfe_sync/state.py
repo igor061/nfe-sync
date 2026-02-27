@@ -22,17 +22,21 @@ def set_ultimo_numero_nf(estado: dict, cnpj: str, serie: str, numero: int) -> No
     estado.setdefault("numeracao", {})[f"{cnpj}:{serie}"] = numero
 
 
-def get_cooldown(estado: dict, cnpj: str) -> str | None:
-    return estado.get("cooldown", {}).get(cnpj)
+def _chave_cooldown(cnpj: str, ambiente: str) -> str:
+    return f"{cnpj}:{ambiente}"
 
 
-def set_cooldown(estado: dict, cnpj: str, iso_str: str) -> None:
-    estado.setdefault("cooldown", {})[cnpj] = iso_str
+def get_cooldown(estado: dict, cnpj: str, ambiente: str = "homologacao") -> str | None:
+    return estado.get("cooldown", {}).get(_chave_cooldown(cnpj, ambiente))
 
 
-def limpar_cooldown(estado: dict, cnpj: str) -> None:
+def set_cooldown(estado: dict, cnpj: str, iso_str: str, ambiente: str = "homologacao") -> None:
+    estado.setdefault("cooldown", {})[_chave_cooldown(cnpj, ambiente)] = iso_str
+
+
+def limpar_cooldown(estado: dict, cnpj: str, ambiente: str = "homologacao") -> None:
     cooldowns = estado.get("cooldown", {})
-    cooldowns.pop(cnpj, None)
+    cooldowns.pop(_chave_cooldown(cnpj, ambiente), None)
 
 
 def get_ultimo_nsu(estado: dict, cnpj: str) -> int:

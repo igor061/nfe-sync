@@ -60,8 +60,9 @@ def consultar_nsu(
     empresa: EmpresaConfig, estado: dict, state_file: str, nsu: int | None = None
 ) -> dict:
     cnpj = empresa.emitente.cnpj
+    ambiente = "homologacao" if empresa.homologacao else "producao"
 
-    bloqueado, msg = verificar_cooldown(get_cooldown(estado, cnpj))
+    bloqueado, msg = verificar_cooldown(get_cooldown(estado, cnpj, ambiente))
     if bloqueado:
         return {"sucesso": False, "motivo": msg, "documentos": []}
 
@@ -117,7 +118,7 @@ def consultar_nsu(
             })
 
     set_ultimo_nsu(estado, cnpj, ult_nsu)
-    set_cooldown(estado, cnpj, calcular_proximo_cooldown())
+    set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
     salvar_estado(state_file, estado)
 
     return {

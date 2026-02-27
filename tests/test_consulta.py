@@ -66,7 +66,8 @@ class TestConsultarNsu:
 
     def test_bloqueado_por_cooldown(self, empresa_sul, tmp_path):
         futuro = (datetime.now() + timedelta(hours=1)).isoformat(timespec="seconds")
-        estado = {"cooldown": {empresa_sul.emitente.cnpj: futuro}}
+        cnpj = empresa_sul.emitente.cnpj
+        estado = {"cooldown": {f"{cnpj}:homologacao": futuro}}
         state_file = str(tmp_path / "state.json")
 
         resultado = consultar_nsu(empresa_sul, estado, state_file)
@@ -108,7 +109,7 @@ class TestConsultarNsu:
         # verifica que salvou estado
         estado_salvo = carregar_estado(state_file)
         assert estado_salvo["nsu"][empresa_sul.emitente.cnpj] == 42
-        assert empresa_sul.emitente.cnpj in estado_salvo.get("cooldown", {})
+        assert f"{empresa_sul.emitente.cnpj}:homologacao" in estado_salvo.get("cooldown", {})
 
     @patch("nfe_sync.consulta.ComunicacaoSefaz")
     def test_usa_ultimo_nsu_do_estado(self, mock_sefaz_cls, empresa_sul, tmp_path):
