@@ -1,7 +1,7 @@
 import requests
 from pydantic import BaseModel, Field
 
-from ..exceptions import NfeConfigError
+from .exceptions import ApiConfigError
 
 
 class CnpjaEndereco(BaseModel, extra="allow"):
@@ -35,9 +35,9 @@ def consultar(cnpj: str, config: dict, simples: bool = False) -> CnpjaEmpresa:
     headers = config.get("headers", {})
 
     if not base_url:
-        raise NfeConfigError("base_url nao configurada para CNPJa.")
+        raise ApiConfigError("base_url nao configurada para CNPJa.")
     if not headers.get("Authorization"):
-        raise NfeConfigError("Authorization header nao configurado para CNPJa.")
+        raise ApiConfigError("Authorization header nao configurado para CNPJa.")
 
     cnpj_limpo = cnpj.replace(".", "").replace("/", "").replace("-", "")
     url = f"{base_url}/office/{cnpj_limpo}"

@@ -3,7 +3,7 @@ import json
 import pytest
 from nfe_sync.apis.config import carregar_apis, get_api_config
 from nfe_sync.apis.cnpja import CnpjaEmpresa, consultar
-from nfe_sync.exceptions import NfeConfigError
+from nfe_sync.apis.exceptions import ApiConfigError
 
 
 CNPJA_RESPONSE = {
@@ -63,7 +63,7 @@ class TestApisConfig:
         assert "cnpja" in resultado
 
     def test_carregar_apis_arquivo_nao_existe(self):
-        with pytest.raises(NfeConfigError, match="nao encontrado"):
+        with pytest.raises(ApiConfigError, match="nao encontrado"):
             carregar_apis("/tmp/nao_existe_abc123.json")
 
     def test_get_api_config_ok(self, tmp_path):
@@ -75,15 +75,15 @@ class TestApisConfig:
     def test_get_api_config_nao_configurada(self, tmp_path):
         cfg = tmp_path / "apis.json"
         cfg.write_text(json.dumps({"outra": {}}))
-        with pytest.raises(NfeConfigError, match="nao configurada"):
+        with pytest.raises(ApiConfigError, match="nao configurada"):
             get_api_config("cnpja", str(cfg))
 
 
 class TestConsultar:
     def test_config_sem_base_url(self):
-        with pytest.raises(NfeConfigError, match="base_url"):
+        with pytest.raises(ApiConfigError, match="base_url"):
             consultar("33000167000101", {})
 
     def test_config_sem_authorization(self):
-        with pytest.raises(NfeConfigError, match="Authorization"):
+        with pytest.raises(ApiConfigError, match="Authorization"):
             consultar("33000167000101", {"base_url": "https://api.cnpja.com"})

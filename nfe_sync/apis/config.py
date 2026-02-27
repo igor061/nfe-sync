@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from ..exceptions import NfeConfigError
+from .exceptions import ApiConfigError
 
 DEFAULT_CONFIG_FILE = "apis.json"
 
@@ -9,7 +9,7 @@ DEFAULT_CONFIG_FILE = "apis.json"
 def carregar_apis(config_file=DEFAULT_CONFIG_FILE) -> dict:
     path = Path(config_file)
     if not path.exists():
-        raise NfeConfigError(f"Arquivo de configuracao '{config_file}' nao encontrado.")
+        raise ApiConfigError(f"Arquivo de configuracao '{config_file}' nao encontrado.")
     with open(path) as f:
         return json.load(f)
 
@@ -17,7 +17,7 @@ def carregar_apis(config_file=DEFAULT_CONFIG_FILE) -> dict:
 def get_api_config(nome: str, config_file=DEFAULT_CONFIG_FILE) -> dict:
     apis = carregar_apis(config_file)
     if nome not in apis:
-        raise NfeConfigError(
+        raise ApiConfigError(
             f"API '{nome}' nao configurada em '{config_file}'. "
             f"APIs disponiveis: {', '.join(apis.keys())}"
         )

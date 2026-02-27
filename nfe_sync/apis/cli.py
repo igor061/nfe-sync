@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from ..exceptions import NfeConfigError
+from .exceptions import ApiConfigError
 
 
 def cmd_cnpja(args):
@@ -39,7 +39,7 @@ def cli(argv=None):
 
     try:
         args.func(args)
-    except NfeConfigError as e:
+    except ApiConfigError as e:
         print(f"Erro de configuracao: {e}")
         sys.exit(1)
 
