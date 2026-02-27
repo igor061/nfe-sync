@@ -81,8 +81,8 @@ def manifestar(
     motivos = xml_resp.xpath("//ns:xMotivo", namespaces=ns)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=ns)
 
-    os.makedirs("xml/eventos", exist_ok=True)
-    arquivo = f"xml/eventos/{chave}-{operacao}.xml"
+    os.makedirs(f"downloads/{cnpj}", exist_ok=True)
+    arquivo = f"downloads/{cnpj}/{chave}-evento-{operacao}.xml"
     xml_resp_str = etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
     with open(arquivo, "w") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
