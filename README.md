@@ -4,16 +4,32 @@ Biblioteca Python e CLI para emissão, consulta, manifestação e inutilização
 
 ## Instalação
 
+### Pacote instalado via pip
+
 ```bash
 pip install git+https://github.com/seu-usuario/nfe-sync.git
 ```
 
-Ou em modo de desenvolvimento:
+Os comandos `nfe-sync` e `api` ficam disponíveis diretamente no terminal:
+
+```bash
+nfe-sync --help
+api --help
+```
+
+### Modo desenvolvimento (clone do repositório)
 
 ```bash
 git clone https://github.com/seu-usuario/nfe-sync.git
 cd nfe-sync
 pip install -e ".[dev]"
+```
+
+Use os scripts na raiz do projeto, que ativam a virtualenv automaticamente:
+
+```bash
+./run_nfesync --help
+./run_api --help
 ```
 
 ## Configuração
@@ -38,6 +54,8 @@ razao_social = EMPRESA EXEMPLO LTDA
 ```
 
 ## CLI
+
+> Em modo desenvolvimento substitua `nfe-sync` por `./run_nfesync` e `api` por `./run_api`.
 
 ### Emitir NF-e
 
