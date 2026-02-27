@@ -149,6 +149,9 @@ def cmd_consultar_nsu(args):
     print(f"Ultimo NSU: {resultado.get('ultimo_nsu')}")
     print(f"Max NSU: {resultado.get('max_nsu')}")
 
+    for arq in resultado.get("respostas", []):
+        print(f"Resposta salva em: {arq}")
+
     docs = resultado.get("documentos", [])
     if docs:
         print(f"Documentos: {len(docs)}")

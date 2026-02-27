@@ -58,7 +58,6 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
 
 def _processar_docs(xml_resp, documentos):
     docs_xml = xml_resp.xpath("//ns:docZip", namespaces=NS)
-    os.makedirs("downloads/nsu", exist_ok=True)
 
     for doc in docs_xml:
         doc_nsu = doc.get("NSU", "")
@@ -108,6 +107,9 @@ def consultar_nsu(
     x_motivo = None
     pagina = 0
 
+    os.makedirs("downloads/nsu", exist_ok=True)
+    respostas = []
+
     while True:
         pagina += 1
         resp = con.consulta_distribuicao(cnpj=cnpj, nsu=ult_nsu)
@@ -124,7 +126,14 @@ def consultar_nsu(
         ult_nsu = int(ult_nsu_el[0].text) if ult_nsu_el else ult_nsu
         max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
 
-        # 137 = nenhum documento localizado
+        # salvar resposta bruta do servidor
+        xml_str = etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
+        arquivo_resp = f"downloads/nsu/resposta-{cnpj}-{pagina:03d}.xml"
+        with open(arquivo_resp, "w") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write(xml_str)
+        respostas.append(arquivo_resp)
+
         # qualquer status != 138 interrompe o loop
         if c_stat != "138":
             break
@@ -152,4 +161,5 @@ def consultar_nsu(
         "ultimo_nsu": ult_nsu,
         "max_nsu": max_nsu,
         "documentos": documentos,
+        "respostas": respostas,
     }
