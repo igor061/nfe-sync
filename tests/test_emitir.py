@@ -16,14 +16,14 @@ from nfe_sync.models import (
 class TestNumeroNF:
     def test_numero_nf_incrementa(self):
         estado = {}
-        set_ultimo_numero_nf(estado, "10755237000136", "1", 5)
-        ultimo = get_ultimo_numero_nf(estado, "10755237000136", "1")
+        set_ultimo_numero_nf(estado, "99999999000191", "1", 5)
+        ultimo = get_ultimo_numero_nf(estado, "99999999000191", "1")
         numero_nf = ultimo + 1
         assert numero_nf == 6
 
     def test_numero_nf_default_zero(self):
         estado = {}
-        ultimo = get_ultimo_numero_nf(estado, "10755237000136", "1")
+        ultimo = get_ultimo_numero_nf(estado, "99999999000191", "1")
         assert ultimo == 0
 
 
@@ -94,8 +94,8 @@ class TestDadosEmissao:
 
     def test_destinatario_acessivel(self, dados_emissao_padrao):
         dest = dados_emissao_padrao.destinatario
-        assert dest.numero_documento == "10755237000136"
-        assert dest.endereco.uf == "GO"
+        assert dest.numero_documento == "99999999000191"
+        assert dest.endereco.uf == "SP"
 
     def test_campo_obrigatorio_faltando(self):
         with pytest.raises(ValidationError):

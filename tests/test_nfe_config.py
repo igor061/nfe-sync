@@ -7,22 +7,22 @@ INI_COMPLETO = """\
 [SUL]
 path = /tmp/cert.pfx
 senha = 123456
-uf = go
+uf = sp
 homologacao = true
-cnpj = 10755237000136
-razao_social = RM VALPARAISO JOIAS LTDA
-nome_fantasia = CORALLI JOIAS
-inscricao_estadual = 104452420
+cnpj = 99999999000191
+razao_social = EMPRESA TESTE LTDA
+nome_fantasia = EMPRESA TESTE
+inscricao_estadual = 111111111111
 cnae_fiscal = 4783101
 regime_tributario = 1
-logradouro = ROD BR 040 KM 12 GLEBA F
-numero = SN
-complemento = QUADRA01 LOTE 01 LOJA 259
-bairro = PARQUE ESPLANADA III
-municipio = VALPARAISO DE GOIAS
-cod_municipio = 5221858
-endereco_uf = GO
-cep = 72876902
+logradouro = RUA EXEMPLO
+numero = 100
+complemento = SALA 01
+bairro = CENTRO
+municipio = SAO PAULO
+cod_municipio = 3550308
+endereco_uf = SP
+cep = 01310100
 """
 
 
@@ -36,10 +36,10 @@ class TestCarregarEmpresas:
         assert emp.nome == "SUL"
         assert emp.certificado.path == "/tmp/cert.pfx"
         assert emp.certificado.senha == "123456"
-        assert emp.uf == "go"
+        assert emp.uf == "sp"
         assert emp.homologacao is True
-        assert emp.emitente.cnpj == "10755237000136"
-        assert emp.emitente.endereco.municipio == "VALPARAISO DE GOIAS"
+        assert emp.emitente.cnpj == "99999999000191"
+        assert emp.emitente.endereco.municipio == "SAO PAULO"
 
     def test_carregar_config_vazio(self, tmp_path):
         ini = tmp_path / "vazio.ini"

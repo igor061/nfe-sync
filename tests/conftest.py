@@ -12,24 +12,24 @@ from nfe_sync.models import (
 )
 
 
-CHAVE_VALIDA = "52260210755237000136550010000000031361413250"
+CHAVE_VALIDA = "52991299999999999999550010000000011000000010"
 
 ENDERECO_PADRAO = Endereco(
-    logradouro="ROD BR 040 KM 12 GLEBA F",
-    numero="SN",
-    complemento="QUADRA01 LOTE 01 LOJA 259",
-    bairro="PARQUE ESPLANADA III",
-    municipio="VALPARAISO DE GOIAS",
-    cod_municipio="5221858",
-    uf="GO",
-    cep="72876902",
+    logradouro="RUA EXEMPLO",
+    numero="100",
+    complemento="SALA 01",
+    bairro="CENTRO",
+    municipio="SAO PAULO",
+    cod_municipio="3550308",
+    uf="SP",
+    cep="01310100",
 )
 
 EMITENTE_PADRAO = Emitente(
-    cnpj="10755237000136",
-    razao_social="RM VALPARAISO JOIAS LTDA",
-    nome_fantasia="CORALLI JOIAS",
-    inscricao_estadual="104452420",
+    cnpj="99999999000191",
+    razao_social="EMPRESA TESTE LTDA",
+    nome_fantasia="EMPRESA TESTE",
+    inscricao_estadual="111111111111",
     cnae_fiscal="4783101",
     regime_tributario="1",
     endereco=ENDERECO_PADRAO,
@@ -42,7 +42,7 @@ def empresa_sul():
         nome="SUL",
         certificado=Certificado(path="/tmp/cert.pfx", senha="123456"),
         emitente=EMITENTE_PADRAO,
-        uf="go",
+        uf="sp",
         homologacao=True,
     )
 
@@ -53,9 +53,9 @@ def dados_emissao_padrao():
         destinatario=Destinatario(
             razao_social="NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL",
             tipo_documento="CNPJ",
-            numero_documento="10755237000136",
+            numero_documento="99999999000191",
             indicador_ie=1,
-            inscricao_estadual="104452420",
+            inscricao_estadual="111111111111",
             endereco=ENDERECO_PADRAO,
         ),
         produtos=[
