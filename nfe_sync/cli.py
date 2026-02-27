@@ -23,8 +23,13 @@ def _carregar(args):
         print(f"Erro: empresa '{nome}' nao encontrada.")
         print(f"Empresas disponiveis: {', '.join(empresas.keys())}")
         sys.exit(1)
+    empresa = empresas[nome]
+    if args.producao:
+        empresa = empresa.model_copy(update={"homologacao": False})
+    elif args.homologacao:
+        empresa = empresa.model_copy(update={"homologacao": True})
     estado = carregar_estado(STATE_FILE)
-    return empresas[nome], estado
+    return empresa, estado
 
 
 def cmd_emitir(args):
@@ -198,6 +203,9 @@ def cmd_inutilizar(args):
 
 def cli(argv=None):
     parser = argparse.ArgumentParser(prog="nfe-sync", description="NF-e Sync CLI")
+    amb = parser.add_mutually_exclusive_group()
+    amb.add_argument("--producao", action="store_true", help="Forcar ambiente de producao")
+    amb.add_argument("--homologacao", action="store_true", help="Forcar ambiente de homologacao")
     sub = parser.add_subparsers(dest="comando", required=True)
 
     # emitir
