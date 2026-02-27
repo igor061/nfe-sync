@@ -36,14 +36,40 @@ def cmd_cnpja(args):
             print(f"  {s.nome} ({s.tipo}) - {s.qualificacao}")
 
 
+def cmd_cnpjws(args):
+    from .cnpjws import consultar
+
+    empresa = consultar(args.cnpj)
+
+    print(f"CNPJ: {empresa.cnpj}")
+    print(f"Razao Social: {empresa.razao_social}")
+    print(f"Nome Fantasia: {empresa.nome_fantasia}")
+    print(f"Situacao: {empresa.situacao_cadastral}")
+    print(f"Inicio Atividade: {empresa.data_inicio_atividade}")
+    print(f"CNAE: {empresa.cnae_fiscal} - {empresa.cnae_fiscal_descricao}")
+    end = empresa.endereco
+    print(f"Endereco: {end.logradouro}, {end.numero} - {end.bairro}")
+    print(f"Cidade: {end.municipio} / {end.uf} - CEP {end.cep}")
+    if empresa.inscricoes_estaduais:
+        print("Inscricoes Estaduais:")
+        for ie in empresa.inscricoes_estaduais:
+            ativo = "ativa" if ie.ativo else "inativa"
+            print(f"  {ie.uf}: {ie.inscricao_estadual} ({ativo})")
+
+
 def cli(argv=None):
     parser = argparse.ArgumentParser(prog="api", description="CLI para consulta de APIs externas")
     sub = parser.add_subparsers(dest="comando", required=True)
 
     # cnpja
-    p_cnpja = sub.add_parser("cnpja", help="Consultar CNPJ via CNPJa")
+    p_cnpja = sub.add_parser("cnpja", help="Consultar CNPJ via CNPJa (open.cnpja.com)")
     p_cnpja.add_argument("cnpj", help="CNPJ a consultar")
     p_cnpja.set_defaults(func=cmd_cnpja)
+
+    # cnpjws
+    p_cnpjws = sub.add_parser("cnpjws", help="Consultar CNPJ via publica.cnpj.ws (com inscricao estadual)")
+    p_cnpjws.add_argument("cnpj", help="CNPJ a consultar")
+    p_cnpjws.set_defaults(func=cmd_cnpjws)
 
     args = parser.parse_args(argv)
 
