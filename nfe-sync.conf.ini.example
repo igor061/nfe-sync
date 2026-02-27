@@ -1,0 +1,35 @@
+# Configuracao do nfe-sync
+# Copie este arquivo para nfe-sync.conf.ini e preencha com seus dados.
+# Cada secao representa uma empresa. O nome da secao e usado na CLI (ex: nfe-sync emitir MINHAEMPRESA).
+
+[MINHAEMPRESA]
+# Certificado digital A1 (.pfx ou .p12)
+path = certs/certificado.pfx
+senha = senha_do_certificado
+
+# UF da empresa (sigla em minusculo)
+uf = sp
+
+# true = homologacao (testes), false = producao
+homologacao = true
+
+# Dados do emitente
+cnpj = 00000000000191
+razao_social = EMPRESA EXEMPLO LTDA
+nome_fantasia = EMPRESA EXEMPLO
+inscricao_estadual = 000000000000
+cnae_fiscal = 4783101
+regime_tributario = 1
+
+# Endereco
+logradouro = RUA EXEMPLO
+numero = 100
+complemento = SALA 01
+bairro = CENTRO
+municipio = SAO PAULO
+cod_municipio = 3550308
+endereco_uf = SP
+cep = 01310100
+
+# Opcional
+email = contato@empresa.com.br
