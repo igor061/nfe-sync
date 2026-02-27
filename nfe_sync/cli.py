@@ -146,6 +146,8 @@ def cmd_consultar_nsu(args):
 
     print(f"Status: {resultado.get('status')}")
     print(f"Motivo: {resultado.get('motivo')}")
+    print(f"Ultimo NSU: {resultado.get('ultimo_nsu')}")
+    print(f"Max NSU: {resultado.get('max_nsu')}")
 
     docs = resultado.get("documentos", [])
     if docs:
@@ -155,10 +157,6 @@ def cmd_consultar_nsu(args):
                 print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
             else:
                 print(f"  NSU {doc['nsu']} ({doc['schema']}) — {doc['arquivo']}")
-        print(f"Ultimo NSU: {resultado.get('ultimo_nsu')}")
-        print(f"Max NSU: {resultado.get('max_nsu')}")
-    else:
-        print("Nenhum documento localizado.")
 
 
 def cmd_manifestar(args):

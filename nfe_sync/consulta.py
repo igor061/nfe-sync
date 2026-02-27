@@ -119,15 +119,15 @@ def consultar_nsu(
         c_stat = status[0].text if status else None
         x_motivo = motivo[0].text if motivo else None
 
-        # 137 = nenhum documento localizado
-        if c_stat == "137":
-            break
-
-        # 138 = documento localizado
         ult_nsu_el = xml_resp.xpath("//ns:ultNSU", namespaces=NS)
         max_nsu_el = xml_resp.xpath("//ns:maxNSU", namespaces=NS)
         ult_nsu = int(ult_nsu_el[0].text) if ult_nsu_el else ult_nsu
         max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
+
+        # 137 = nenhum documento localizado
+        # qualquer status != 138 interrompe o loop
+        if c_stat != "138":
+            break
 
         _processar_docs(xml_resp, documentos)
 
@@ -139,10 +139,6 @@ def consultar_nsu(
 
         # se ultNSU == maxNSU, nao ha mais documentos
         if ult_nsu >= max_nsu:
-            break
-
-        # qualquer outro status (erro, rejeicao) interrompe o loop
-        if c_stat != "138":
             break
 
     # cooldown so ativa quando nao ha mais documentos
