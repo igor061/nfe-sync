@@ -12,3 +12,5 @@ downloads/
 xml/
 log/
 apis.json
+dist/
+build/
