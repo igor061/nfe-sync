@@ -62,13 +62,21 @@ def cli(argv=None):
     sub = parser.add_subparsers(dest="comando", required=True)
 
     # cnpja
-    p_cnpja = sub.add_parser("cnpja", help="Consultar CNPJ via CNPJa (open.cnpja.com)")
-    p_cnpja.add_argument("cnpj", help="CNPJ a consultar")
+    p_cnpja = sub.add_parser(
+        "cnpja",
+        help="Consultar CNPJ via CNPJa (open.cnpja.com)",
+        epilog="Exemplo: api cnpja 33.000.167/0001-01",
+    )
+    p_cnpja.add_argument("cnpj", help="CNPJ a consultar (com ou sem formatacao)")
     p_cnpja.set_defaults(func=cmd_cnpja)
 
     # cnpjws
-    p_cnpjws = sub.add_parser("cnpjws", help="Consultar CNPJ via publica.cnpj.ws (com inscricao estadual)")
-    p_cnpjws.add_argument("cnpj", help="CNPJ a consultar")
+    p_cnpjws = sub.add_parser(
+        "cnpjws",
+        help="Consultar CNPJ via publica.cnpj.ws (inclui inscricao estadual)",
+        epilog="Exemplo: api cnpjws 33.000.167/0001-01",
+    )
+    p_cnpjws.add_argument("cnpj", help="CNPJ a consultar (com ou sem formatacao)")
     p_cnpjws.set_defaults(func=cmd_cnpjws)
 
     args = parser.parse_args(argv)
