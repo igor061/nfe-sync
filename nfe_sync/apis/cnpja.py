@@ -5,12 +5,13 @@ from ..exceptions import NfeConfigError
 
 
 class CnpjaEndereco(BaseModel, extra="allow"):
-    logradouro: str = ""
-    numero: str = ""
-    bairro: str = ""
+    logradouro: str = Field(default="", alias="street")
+    numero: str = Field(default="", alias="number")
+    bairro: str = Field(default="", alias="district")
     municipio: str = Field(default="", alias="municipality")
     uf: str = Field(default="", alias="state")
     cep: str = Field(default="", alias="zip")
+    complemento: str = Field(default="", alias="details")
 
 
 class CnpjaSocio(BaseModel, extra="allow"):

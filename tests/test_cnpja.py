@@ -49,9 +49,9 @@ class TestCnpjaEmpresa:
         assert empresa.nome_fantasia == ""
         assert empresa.socios == []
 
-    def test_extra_fields_allowed(self):
-        data = {**CNPJA_RESPONSE, "campoExtra": "valor"}
-        empresa = CnpjaEmpresa.model_validate(data)
+    def test_campos_extras_permitidos(self):
+        dados = {**CNPJA_RESPONSE, "campoExtra": "valor"}
+        empresa = CnpjaEmpresa.model_validate(dados)
         assert empresa.cnpj == "33000167000101"
 
 
@@ -59,8 +59,8 @@ class TestApisConfig:
     def test_carregar_apis_ok(self, tmp_path):
         cfg = tmp_path / "apis.json"
         cfg.write_text(json.dumps({"cnpja": {"base_url": "https://api.cnpja.com"}}))
-        result = carregar_apis(str(cfg))
-        assert "cnpja" in result
+        resultado = carregar_apis(str(cfg))
+        assert "cnpja" in resultado
 
     def test_carregar_apis_arquivo_nao_existe(self):
         with pytest.raises(NfeConfigError, match="nao encontrado"):
@@ -69,8 +69,8 @@ class TestApisConfig:
     def test_get_api_config_ok(self, tmp_path):
         cfg = tmp_path / "apis.json"
         cfg.write_text(json.dumps({"cnpja": {"base_url": "https://api.cnpja.com"}}))
-        result = get_api_config("cnpja", str(cfg))
-        assert result["base_url"] == "https://api.cnpja.com"
+        resultado = get_api_config("cnpja", str(cfg))
+        assert resultado["base_url"] == "https://api.cnpja.com"
 
     def test_get_api_config_nao_configurada(self, tmp_path):
         cfg = tmp_path / "apis.json"
