@@ -1,7 +1,9 @@
 import argparse
+import subprocess
 import sys
 import urllib3
 from decimal import Decimal
+from importlib.metadata import version, PackageNotFoundError
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -18,6 +20,92 @@ from .exceptions import NfeConfigError, NfeValidationError
 
 CONFIG_FILE = "nfe-sync.conf.ini"
 STATE_FILE = ".state.json"
+GITHUB_RAW = "https://raw.githubusercontent.com/igor061/nfe-sync/main/pyproject.toml"
+GITHUB_CHANGELOG = "https://raw.githubusercontent.com/igor061/nfe-sync/main/CHANGELOG.md"
+GITHUB_PKG = "git+https://github.com/igor061/nfe-sync.git"
+
+
+def _versao_local() -> str:
+    try:
+        return version("nfe-sync")
+    except PackageNotFoundError:
+        return "desconhecida"
+
+
+def _versao_remota() -> str | None:
+    try:
+        import urllib.request
+        with urllib.request.urlopen(GITHUB_RAW, timeout=5) as r:
+            for linha in r.read().decode().splitlines():
+                if linha.startswith("version ="):
+                    return linha.split('"')[1]
+    except Exception:
+        return None
+
+
+def _changelog_novidades(versao_local: str) -> list[str]:
+    try:
+        import re
+        import urllib.request
+        with urllib.request.urlopen(GITHUB_CHANGELOG, timeout=5) as r:
+            conteudo = r.read().decode()
+
+        padrao_versao = re.compile(r"^## (\d+\.\d+\.\d+)")
+
+        def ver_tuple(v):
+            m = re.match(r"(\d+)\.(\d+)\.(\d+)", v)
+            return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+
+        local_t = ver_tuple(versao_local)
+        linhas = []
+        capturando = False
+        for linha in conteudo.splitlines():
+            m = padrao_versao.match(linha)
+            if m:
+                if ver_tuple(m.group(1)) > local_t:
+                    capturando = True
+                    linhas.append(linha)
+                else:
+                    break  # chegou na versao local ou anterior, para
+            elif capturando:
+                linhas.append(linha)
+        return linhas
+    except Exception:
+        return []
+
+
+def cmd_versao(args):
+    local = _versao_local()
+    print(f"Versao instalada: {local}")
+    print("Verificando atualizacoes...")
+    remota = _versao_remota()
+    if remota is None:
+        print("Nao foi possivel verificar a versao remota.")
+    elif remota == local:
+        print(f"Voce esta na versao mais recente ({local}).")
+    else:
+        print(f"Nova versao disponivel: {remota}")
+        novidades = _changelog_novidades(local)
+        if novidades:
+            print("\nNovidades:")
+            for linha in novidades:
+                print(linha)
+        print(f"\nPara atualizar: nfe-sync atualizar")
+
+
+def cmd_atualizar(args):
+    local = _versao_local()
+    print(f"Versao atual: {local}")
+    print("Verificando atualizacoes...")
+    remota = _versao_remota()
+    if remota is None:
+        print("Nao foi possivel verificar a versao remota.")
+        sys.exit(1)
+    if remota == local:
+        print(f"Voce ja esta na versao mais recente ({local}).")
+        return
+    print(f"Atualizando {local} -> {remota}...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", GITHUB_PKG], check=True)
 
 
 def _carregar(args):
@@ -252,6 +340,14 @@ def cli(argv=None):
     p_inutilizar.add_argument("--fim", required=True, type=int, help="Numero final")
     p_inutilizar.add_argument("--justificativa", required=True, help="Justificativa (min 15 chars)")
     p_inutilizar.set_defaults(func=cmd_inutilizar)
+
+    # versao
+    p_versao = sub.add_parser("versao", help="Exibe versao instalada e verifica atualizacoes")
+    p_versao.set_defaults(func=cmd_versao)
+
+    # atualizar
+    p_atualizar = sub.add_parser("atualizar", help="Atualiza o nfe-sync para a versao mais recente")
+    p_atualizar.set_defaults(func=cmd_atualizar)
 
     args = parser.parse_args(argv)
 
