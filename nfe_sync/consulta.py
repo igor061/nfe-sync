@@ -45,9 +45,10 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
     motivos = xml_sit.xpath("//ns:xMotivo", namespaces=NS)
     situacao = [{"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)]
 
-    os.makedirs("downloads", exist_ok=True)
+    cnpj = empresa.emitente.cnpj
+    os.makedirs(f"downloads/{cnpj}", exist_ok=True)
     xml_sit_str = etree.tostring(xml_sit, encoding="unicode", pretty_print=True)
-    arquivo = f"downloads/{chave}-situacao.xml"
+    arquivo = f"downloads/{cnpj}/{chave}-situacao.xml"
     with open(arquivo, "w") as f:
         f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
         f.write(xml_sit_str)
@@ -58,7 +59,7 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
     }
 
 
-def _processar_docs(xml_resp, documentos):
+def _processar_docs(xml_resp, documentos, cnpj: str):
     docs_xml = xml_resp.xpath("//ns:docZip", namespaces=NS)
 
     for doc in docs_xml:
@@ -76,7 +77,7 @@ def _processar_docs(xml_resp, documentos):
                 serie = (xml_doc.xpath("//*[local-name()='ide']/*[local-name()='serie']/text()") or [""])[0]
                 numero = (xml_doc.xpath("//*[local-name()='ide']/*[local-name()='nNF']/text()") or [""])[0]
                 nome = f"{cnpj_dest}-{cnpj_emit}-{serie}-{numero}" if any([cnpj_dest, cnpj_emit, serie, numero]) else doc_nsu
-            arquivo = f"downloads/nsu/{nome}.xml"
+            arquivo = f"downloads/{cnpj}/{nome}.xml"
             with open(arquivo, "w") as f:
                 f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
                 f.write(xml_str)
@@ -119,7 +120,7 @@ def consultar_nsu(
     x_motivo = None
     pagina = 0
 
-    os.makedirs("downloads/nsu", exist_ok=True)
+    os.makedirs(f"downloads/{cnpj}", exist_ok=True)
     respostas = []
 
     while True:
@@ -146,7 +147,7 @@ def consultar_nsu(
         if c_stat != "138":
             break
 
-        _processar_docs(xml_resp, documentos)
+        _processar_docs(xml_resp, documentos, cnpj)
 
         set_ultimo_nsu(estado, cnpj, ult_nsu)
         salvar_estado(state_file, estado)
