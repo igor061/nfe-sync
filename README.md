@@ -1,6 +1,8 @@
 # nfe-sync
 
-Biblioteca Python e CLI para emissão, consulta, manifestação e inutilização de NF-e via SEFAZ.
+Integração direta com a SEFAZ via linha de comando. Com o nfe-sync você consulta NF-es recebidas, manifesta documentos fiscais, inutiliza numerações e pesquisa dados de CNPJ — tudo sem depender de plataformas intermediárias, pagando apenas pelo certificado digital que você já tem.
+
+Ideal para empresas que querem automatizar o fluxo fiscal sem depender de ERP ou plataformas de terceiros.
 
 ## Instalação
 
