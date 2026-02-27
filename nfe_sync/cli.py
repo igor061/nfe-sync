@@ -162,7 +162,8 @@ def cmd_consultar_nsu(args):
             if "erro" in doc:
                 print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
             else:
-                print(f"  NSU {doc['nsu']} ({doc['schema']}) — {doc['arquivo']}")
+                chave = doc.get("chave") or doc["nsu"]
+                print(f"  NSU {doc['nsu']} ({doc['schema']}) chave={chave} — {doc['arquivo']}")
 
 
 def cmd_manifestar(args):
