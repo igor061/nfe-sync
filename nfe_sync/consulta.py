@@ -56,43 +56,8 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
     }
 
 
-def consultar_nsu(
-    empresa: EmpresaConfig, estado: dict, state_file: str, nsu: int | None = None
-) -> dict:
-    cnpj = empresa.emitente.cnpj
-    ambiente = "homologacao" if empresa.homologacao else "producao"
-
-    bloqueado, msg = verificar_cooldown(get_cooldown(estado, cnpj, ambiente))
-    if bloqueado:
-        return {"sucesso": False, "motivo": msg, "documentos": []}
-
-    if nsu is None:
-        nsu = get_ultimo_nsu(estado, cnpj)
-
-    con = ComunicacaoSefaz(
-        empresa.uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
-    )
-    resp = con.consulta_distribuicao(cnpj=cnpj, nsu=nsu)
-
-    xml_resp = etree.fromstring(resp.content if hasattr(resp, "content") else resp)
-    status = xml_resp.xpath("//ns:cStat", namespaces=NS)
-    motivo = xml_resp.xpath("//ns:xMotivo", namespaces=NS)
-
-    c_stat = status[0].text if status else None
-    x_motivo = motivo[0].text if motivo else None
-
-    # 137 = nenhum documento localizado
-    # 138 = documento localizado
-    if c_stat == "137":
-        return {"sucesso": True, "status": c_stat, "motivo": x_motivo, "documentos": []}
-
-    ult_nsu_el = xml_resp.xpath("//ns:ultNSU", namespaces=NS)
-    max_nsu_el = xml_resp.xpath("//ns:maxNSU", namespaces=NS)
-    ult_nsu = int(ult_nsu_el[0].text) if ult_nsu_el else nsu
-    max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
-
+def _processar_docs(xml_resp, documentos):
     docs_xml = xml_resp.xpath("//ns:docZip", namespaces=NS)
-    documentos = []
     os.makedirs("downloads/nsu", exist_ok=True)
 
     for doc in docs_xml:
@@ -117,12 +82,75 @@ def consultar_nsu(
                 "erro": str(e),
             })
 
-    set_ultimo_nsu(estado, cnpj, ult_nsu)
+
+def consultar_nsu(
+    empresa: EmpresaConfig, estado: dict, state_file: str, nsu: int | None = None,
+    callback=None,
+) -> dict:
+    cnpj = empresa.emitente.cnpj
+    ambiente = "homologacao" if empresa.homologacao else "producao"
+
+    bloqueado, msg = verificar_cooldown(get_cooldown(estado, cnpj, ambiente))
+    if bloqueado:
+        return {"sucesso": False, "motivo": msg, "documentos": []}
+
+    if nsu is None:
+        nsu = get_ultimo_nsu(estado, cnpj)
+
+    con = ComunicacaoSefaz(
+        empresa.uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
+    )
+
+    documentos = []
+    ult_nsu = nsu
+    max_nsu = nsu
+    c_stat = None
+    x_motivo = None
+    pagina = 0
+
+    while True:
+        pagina += 1
+        resp = con.consulta_distribuicao(cnpj=cnpj, nsu=ult_nsu)
+
+        xml_resp = etree.fromstring(resp.content if hasattr(resp, "content") else resp)
+        status = xml_resp.xpath("//ns:cStat", namespaces=NS)
+        motivo = xml_resp.xpath("//ns:xMotivo", namespaces=NS)
+
+        c_stat = status[0].text if status else None
+        x_motivo = motivo[0].text if motivo else None
+
+        # 137 = nenhum documento localizado
+        if c_stat == "137":
+            break
+
+        # 138 = documento localizado
+        ult_nsu_el = xml_resp.xpath("//ns:ultNSU", namespaces=NS)
+        max_nsu_el = xml_resp.xpath("//ns:maxNSU", namespaces=NS)
+        ult_nsu = int(ult_nsu_el[0].text) if ult_nsu_el else ult_nsu
+        max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
+
+        _processar_docs(xml_resp, documentos)
+
+        set_ultimo_nsu(estado, cnpj, ult_nsu)
+        salvar_estado(state_file, estado)
+
+        if callback:
+            callback(pagina, len(documentos), ult_nsu, max_nsu)
+
+        # se ultNSU == maxNSU, nao ha mais documentos
+        if ult_nsu >= max_nsu:
+            break
+
+        # qualquer outro status (erro, rejeicao) interrompe o loop
+        if c_stat != "138":
+            break
+
+    # cooldown so ativa quando nao ha mais documentos
     set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
     salvar_estado(state_file, estado)
 
     return {
-        "sucesso": c_stat == "138",
+        "sucesso": c_stat in ("137", "138"),
         "status": c_stat,
         "motivo": x_motivo,
         "ultimo_nsu": ult_nsu,

@@ -134,8 +134,11 @@ def cmd_consultar_nsu(args):
     print(f"Consultando distribuicao DFe (NSU: {nsu if nsu is not None else 'ultimo salvo'})...")
     print()
 
+    def progresso(pagina, total_docs, ult_nsu, max_nsu):
+        print(f"  Pagina {pagina}: {total_docs} docs ate agora (NSU {ult_nsu}/{max_nsu})")
+
     from .consulta import consultar_nsu
-    resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu)
+    resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu, callback=progresso)
 
     if not resultado.get("sucesso") and "motivo" in resultado and not resultado.get("status"):
         print(f"BLOQUEADO: {resultado['motivo']}")

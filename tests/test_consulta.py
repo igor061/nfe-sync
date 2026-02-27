@@ -89,11 +89,25 @@ class TestConsultarNsu:
         assert resultado["status"] == "137"
         assert resultado["documentos"] == []
 
+    XML_COM_DOC_FINAL = b"""<?xml version="1.0" encoding="utf-8"?>
+    <retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">
+        <tpAmb>2</tpAmb>
+        <cStat>138</cStat>
+        <xMotivo>Documento localizado</xMotivo>
+        <ultNSU>000000000000100</ultNSU>
+        <maxNSU>000000000000100</maxNSU>
+        <loteDistDFeInt>
+            <docZip NSU="000000000000100" schema="resNFe_v1.01.xsd">H4sIAAAAAAAAA6tWKkktLlGyUlAqS8wpTgUAhRxpOhUAAAA=</docZip>
+        </loteDistDFeInt>
+    </retDistDFeInt>"""
+
     @patch("nfe_sync.consulta.ComunicacaoSefaz")
     def test_documento_localizado(self, mock_sefaz_cls, empresa_sul, tmp_path):
-        mock_resp = MagicMock()
-        mock_resp.content = self.XML_COM_DOC
-        mock_sefaz_cls.return_value.consulta_distribuicao.return_value = mock_resp
+        resp1 = MagicMock()
+        resp1.content = self.XML_COM_DOC
+        resp2 = MagicMock()
+        resp2.content = self.XML_COM_DOC_FINAL
+        mock_sefaz_cls.return_value.consulta_distribuicao.side_effect = [resp1, resp2]
 
         state_file = str(tmp_path / "state.json")
         estado = {}
@@ -101,14 +115,15 @@ class TestConsultarNsu:
         resultado = consultar_nsu(empresa_sul, estado, state_file)
         assert resultado["sucesso"] is True
         assert resultado["status"] == "138"
-        assert resultado["ultimo_nsu"] == 42
+        assert resultado["ultimo_nsu"] == 100
         assert resultado["max_nsu"] == 100
-        assert len(resultado["documentos"]) == 1
+        assert len(resultado["documentos"]) == 2
         assert resultado["documentos"][0]["nsu"] == "000000000000042"
+        assert resultado["documentos"][1]["nsu"] == "000000000000100"
 
         # verifica que salvou estado
         estado_salvo = carregar_estado(state_file)
-        assert estado_salvo["nsu"][empresa_sul.emitente.cnpj] == 42
+        assert estado_salvo["nsu"][empresa_sul.emitente.cnpj] == 100
         assert f"{empresa_sul.emitente.cnpj}:homologacao" in estado_salvo.get("cooldown", {})
 
     @patch("nfe_sync.consulta.ComunicacaoSefaz")
