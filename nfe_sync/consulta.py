@@ -68,7 +68,14 @@ def _processar_docs(xml_resp, documentos):
             xml_doc = DescompactaGzip.descompacta(doc.text)
             xml_str = etree.tostring(xml_doc, encoding="unicode", pretty_print=True)
             chaves = xml_doc.xpath("//*[local-name()='chNFe']/text()")
-            nome = chaves[0] if chaves else doc_nsu
+            if chaves:
+                nome = chaves[0]
+            else:
+                cnpj_dest = (xml_doc.xpath("//*[local-name()='dest']/*[local-name()='CNPJ']/text()") or [""])[0]
+                cnpj_emit = (xml_doc.xpath("//*[local-name()='emit']/*[local-name()='CNPJ']/text()") or [""])[0]
+                serie = (xml_doc.xpath("//*[local-name()='ide']/*[local-name()='serie']/text()") or [""])[0]
+                numero = (xml_doc.xpath("//*[local-name()='ide']/*[local-name()='nNF']/text()") or [""])[0]
+                nome = f"{cnpj_dest}-{cnpj_emit}-{serie}-{numero}" if any([cnpj_dest, cnpj_emit, serie, numero]) else doc_nsu
             arquivo = f"downloads/nsu/{nome}.xml"
             with open(arquivo, "w") as f:
                 f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
