@@ -1,6 +1,9 @@
 import argparse
 import sys
+import urllib3
 from decimal import Decimal
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 from .config import carregar_empresas
 from .models import Destinatario, Produto, Pagamento, DadosEmissao, Endereco
