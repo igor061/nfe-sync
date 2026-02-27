@@ -1,52 +1,81 @@
 import requests
 from pydantic import BaseModel, Field
 
-from .exceptions import ApiConfigError
+
+BASE_URL_PUBLICA = "https://open.cnpja.com"
 
 
 class CnpjaEndereco(BaseModel, extra="allow"):
     logradouro: str = Field(default="", alias="street")
     numero: str = Field(default="", alias="number")
     bairro: str = Field(default="", alias="district")
-    municipio: str = Field(default="", alias="municipality")
+    cidade: str = Field(default="", alias="city")
     uf: str = Field(default="", alias="state")
     cep: str = Field(default="", alias="zip")
-    complemento: str = Field(default="", alias="details")
+    complemento: str | None = Field(default=None, alias="details")
+
+
+class CnpjaStatus(BaseModel, extra="allow"):
+    id: int = 0
+    texto: str = Field(default="", alias="text")
+
+
+class CnpjaAtividade(BaseModel, extra="allow"):
+    id: int = 0
+    texto: str = Field(default="", alias="text")
 
 
 class CnpjaSocio(BaseModel, extra="allow"):
-    nome: str = Field(default="", alias="name")
-    tipo: str = Field(default="", alias="type")
-    qualificacao: str = Field(default="", alias="role")
+    nome: str = ""
+    tipo: str = ""
+    qualificacao: str = ""
+
+    @classmethod
+    def from_api(cls, membro: dict) -> "CnpjaSocio":
+        pessoa = membro.get("person", {})
+        cargo = membro.get("role", {})
+        return cls(
+            nome=pessoa.get("name", ""),
+            tipo=pessoa.get("type", ""),
+            qualificacao=cargo.get("text", ""),
+        )
 
 
 class CnpjaEmpresa(BaseModel, extra="allow"):
     cnpj: str = Field(default="", alias="taxId")
-    razao_social: str = Field(default="", alias="company")
+    razao_social: str = ""
     nome_fantasia: str = Field(default="", alias="alias")
     data_abertura: str = Field(default="", alias="founded")
-    situacao: str = Field(default="", alias="statusDate")
+    situacao: CnpjaStatus = Field(default_factory=CnpjaStatus, alias="status")
+    atividade_principal: CnpjaAtividade = Field(default_factory=CnpjaAtividade, alias="mainActivity")
     endereco: CnpjaEndereco = Field(default_factory=CnpjaEndereco, alias="address")
-    socios: list[CnpjaSocio] = Field(default_factory=list, alias="members")
+    socios: list[CnpjaSocio] = Field(default_factory=list)
+
+    @classmethod
+    def from_api(cls, dados: dict) -> "CnpjaEmpresa":
+        empresa_obj = dados.get("company", {})
+        membros = empresa_obj.get("members", [])
+        socios = [CnpjaSocio.from_api(m) for m in membros]
+
+        return cls.model_validate({
+            **dados,
+            "razao_social": empresa_obj.get("name", ""),
+            "socios": [s.model_dump() for s in socios],
+        })
 
 
-def consultar(cnpj: str, config: dict, simples: bool = False) -> CnpjaEmpresa:
-    base_url = config.get("base_url")
-    headers = config.get("headers", {})
-
-    if not base_url:
-        raise ApiConfigError("base_url nao configurada para CNPJa.")
-    if not headers.get("Authorization"):
-        raise ApiConfigError("Authorization header nao configurado para CNPJa.")
-
+def consultar(cnpj: str, config: dict | None = None) -> CnpjaEmpresa:
     cnpj_limpo = cnpj.replace(".", "").replace("/", "").replace("-", "")
+
+    if config and config.get("base_url"):
+        base_url = config["base_url"]
+        headers = config.get("headers", {})
+    else:
+        base_url = BASE_URL_PUBLICA
+        headers = {}
+
     url = f"{base_url}/office/{cnpj_limpo}"
-
-    params = {}
-    if simples:
-        params["simples"] = "true"
-
-    resp = requests.get(url, headers=headers, params=params, timeout=30)
+    resp = requests.get(url, headers=headers, timeout=30)
     resp.raise_for_status()
 
-    return CnpjaEmpresa.model_validate(resp.json())
+    return CnpjaEmpresa.from_api(resp.json())
