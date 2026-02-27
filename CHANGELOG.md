@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.9
+- corrigir entrada 0.2.8 no CHANGELOG e mover hook para commit-msg
+
 ## 0.2.8
 - ajustar help com sintaxe dos comandos e mensagens em portugues
 
