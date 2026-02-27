@@ -24,6 +24,11 @@ class CnpjaAtividade(BaseModel, extra="allow"):
     id: int = 0
     texto: str = Field(default="", alias="text")
 
+    @property
+    def cnae(self) -> str:
+        s = str(self.id).zfill(7)
+        return f"{s[:2]}.{s[2:4]}-{s[4]}-{s[5:]}"
+
 
 class CnpjaSocio(BaseModel, extra="allow"):
     nome: str = ""
@@ -48,6 +53,7 @@ class CnpjaEmpresa(BaseModel, extra="allow"):
     data_abertura: str = Field(default="", alias="founded")
     situacao: CnpjaStatus = Field(default_factory=CnpjaStatus, alias="status")
     atividade_principal: CnpjaAtividade = Field(default_factory=CnpjaAtividade, alias="mainActivity")
+    atividades_secundarias: list[CnpjaAtividade] = Field(default_factory=list, alias="sideActivities")
     endereco: CnpjaEndereco = Field(default_factory=CnpjaEndereco, alias="address")
     socios: list[CnpjaSocio] = Field(default_factory=list)
 

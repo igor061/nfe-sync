@@ -21,7 +21,12 @@ def cmd_cnpja(args):
     print(f"Nome Fantasia: {empresa.nome_fantasia}")
     print(f"Data Abertura: {empresa.data_abertura}")
     print(f"Situacao: {empresa.situacao.texto}")
-    print(f"Atividade: {empresa.atividade_principal.texto}")
+    ap = empresa.atividade_principal
+    print(f"CNAE Principal: {ap.cnae} - {ap.texto}")
+    if empresa.atividades_secundarias:
+        print("CNAEs Secundarios:")
+        for a in empresa.atividades_secundarias:
+            print(f"  {a.cnae} - {a.texto}")
     end = empresa.endereco
     print(f"Endereco: {end.logradouro}, {end.numero} - {end.bairro}")
     print(f"Cidade: {end.cidade} / {end.uf} - CEP {end.cep}")
