@@ -5,6 +5,7 @@ from pynfe.utils import etree
 
 from .models import EmpresaConfig
 from .exceptions import NfeValidationError
+from .log import salvar_resposta_sefaz
 
 
 def inutilizar(
@@ -42,6 +43,7 @@ def inutilizar(
 
     ns = {"ns": "http://www.portalfiscal.inf.br/nfe"}
     xml_resp = etree.fromstring(resposta.content)
+    salvar_resposta_sefaz(xml_resp, "inutilizacao", f"{cnpj}-serie{serie}-{num_ini}-{num_fim}")
 
     stats = xml_resp.xpath("//ns:cStat", namespaces=ns)
     motivos = xml_resp.xpath("//ns:xMotivo", namespaces=ns)

@@ -7,6 +7,7 @@ from pynfe.utils.descompactar import DescompactaGzip
 
 from .models import EmpresaConfig
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
+from .log import salvar_resposta_sefaz
 
 
 COOLDOWN_MINUTOS = 61
@@ -39,6 +40,7 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
 
     resp_sit = con.consulta_nota(modelo="nfe", chave=chave)
     xml_sit = etree.fromstring(resp_sit.content)
+    salvar_resposta_sefaz(xml_sit, "consulta", chave)
     stats = xml_sit.xpath("//ns:cStat", namespaces=NS)
     motivos = xml_sit.xpath("//ns:xMotivo", namespaces=NS)
     situacao = [{"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)]
@@ -127,11 +129,7 @@ def consultar_nsu(
         max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
 
         # salvar resposta bruta do servidor
-        xml_str = etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
-        arquivo_resp = f"downloads/nsu/resposta-{cnpj}-{pagina:03d}.xml"
-        with open(arquivo_resp, "w") as f:
-            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-            f.write(xml_str)
+        arquivo_resp = salvar_resposta_sefaz(xml_resp, "dist-dfe", f"{cnpj}-p{pagina:03d}")
         respostas.append(arquivo_resp)
 
         # qualquer status != 138 interrompe o loop

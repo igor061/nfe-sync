@@ -10,6 +10,7 @@ from pynfe.utils import etree
 
 from .models import EmpresaConfig
 from .exceptions import NfeValidationError
+from .log import salvar_resposta_sefaz
 
 
 OPERACOES = {
@@ -74,6 +75,7 @@ def manifestar(
 
     ns = {"ns": "http://www.portalfiscal.inf.br/nfe"}
     xml_resp = etree.fromstring(resposta.content)
+    salvar_resposta_sefaz(xml_resp, "manifestacao", f"{cnpj}-{operacao}")
 
     stats = xml_resp.xpath("//ns:cStat", namespaces=ns)
     motivos = xml_resp.xpath("//ns:xMotivo", namespaces=ns)

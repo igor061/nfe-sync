@@ -12,6 +12,7 @@ from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 
 from .models import EmpresaConfig, DadosEmissao
+from .log import salvar_resposta_sefaz
 
 
 def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmissao) -> dict:
@@ -133,6 +134,7 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
         codigo = resposta[0]
         if codigo == 0:
             nfe_proc = resposta[1]
+            salvar_resposta_sefaz(nfe_proc, "emissao", cnpj)
             status = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:cStat", namespaces=ns)
             motivo = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:xMotivo", namespaces=ns)
             protocolo = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:nProt", namespaces=ns)
@@ -161,6 +163,7 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
                 body = etree.fromstring(
                     http_resp.content if hasattr(http_resp, "content") else http_resp
                 )
+                salvar_resposta_sefaz(body, "emissao-erro", cnpj)
                 stats = body.xpath("//ns:cStat", namespaces=ns)
                 motivos = body.xpath("//ns:xMotivo", namespaces=ns)
                 erros = [
