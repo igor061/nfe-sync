@@ -10,6 +10,12 @@ Biblioteca Python e CLI para emissão, consulta, manifestação e inutilização
 pip install git+https://github.com/igor061/nfe-sync.git
 ```
 
+Para atualizar:
+
+```bash
+pip install --upgrade git+https://github.com/igor061/nfe-sync.git
+```
+
 Os comandos `nfe-sync` e `api_cli` ficam disponíveis diretamente no terminal:
 
 ```bash
