@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.10
+- corrigir hook: usar post-commit com amend para mensagem correta no CHANGELOG
+
 ## 0.2.9
 - corrigir entrada 0.2.8 no CHANGELOG e mover hook para commit-msg
 
