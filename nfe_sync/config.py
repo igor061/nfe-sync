@@ -1,14 +1,10 @@
 import configparser
 
 from .exceptions import NfeConfigError
-from .models import Certificado, Emitente, Endereco, EmpresaConfig
+from .models import Certificado, Emitente, EmpresaConfig
 
 
-CAMPOS_CERTIFICADO = ("path", "senha")
-CAMPOS_OBRIGATORIOS = ("path", "senha", "uf", "homologacao", "cnpj", "razao_social",
-                        "nome_fantasia", "inscricao_estadual", "cnae_fiscal",
-                        "regime_tributario", "logradouro", "numero", "bairro",
-                        "municipio", "cod_municipio", "endereco_uf", "cep")
+CAMPOS_OBRIGATORIOS = ("path", "senha", "uf", "homologacao", "cnpj")
 
 
 def _parse_homologacao(valor: str) -> bool:
@@ -27,25 +23,13 @@ def _parse_secao(nome: str, secao: configparser.SectionProxy) -> EmpresaConfig:
         senha=secao["senha"],
     )
 
-    endereco = Endereco(
-        logradouro=secao["logradouro"],
-        numero=secao["numero"],
-        complemento=secao.get("complemento", ""),
-        bairro=secao["bairro"],
-        municipio=secao["municipio"],
-        cod_municipio=secao["cod_municipio"],
-        uf=secao["endereco_uf"],
-        cep=secao["cep"],
-    )
-
     emitente = Emitente(
         cnpj=secao["cnpj"],
-        razao_social=secao["razao_social"],
-        nome_fantasia=secao["nome_fantasia"],
-        inscricao_estadual=secao["inscricao_estadual"],
-        cnae_fiscal=secao["cnae_fiscal"],
-        regime_tributario=secao["regime_tributario"],
-        endereco=endereco,
+        razao_social=secao.get("razao_social", ""),
+        nome_fantasia=secao.get("nome_fantasia", ""),
+        inscricao_estadual=secao.get("inscricao_estadual", ""),
+        cnae_fiscal=secao.get("cnae_fiscal", ""),
+        regime_tributario=secao.get("regime_tributario", ""),
     )
 
     return EmpresaConfig(

@@ -44,17 +44,15 @@ cp nfe-sync.conf.ini.example nfe-sync.conf.ini
 > os dados cadastrais da empresa no `nfe-sync.conf.ini`. Após isso, preencha manualmente
 > apenas `path` (caminho do certificado .pfx) e `senha`.
 
-Cada seção do arquivo representa uma empresa:
+Cada seção do arquivo representa uma empresa. Apenas 5 campos são obrigatórios:
 
 ```ini
 [MINHAEMPRESA]
-path = certs/certificado.pfx
-senha = senha_do_certificado
-uf = sp
-homologacao = true
-cnpj = 00000000000191
-razao_social = EMPRESA EXEMPLO LTDA
-...
+path = certs/certificado.pfx   # caminho do certificado A1
+senha = senha_do_certificado   # senha do certificado
+uf = sp                        # UF da empresa
+homologacao = true             # true = testes, false = producao
+cnpj = 00000000000191          # CNPJ somente numeros
 ```
 
 ## CLI

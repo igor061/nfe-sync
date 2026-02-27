@@ -21,12 +21,12 @@ class Endereco(BaseModel):
 
 class Emitente(BaseModel):
     cnpj: str
-    razao_social: str
-    nome_fantasia: str
-    inscricao_estadual: str
-    cnae_fiscal: str
-    regime_tributario: str
-    endereco: Endereco
+    razao_social: str = ""
+    nome_fantasia: str = ""
+    inscricao_estadual: str = ""
+    cnae_fiscal: str = ""
+    regime_tributario: str = ""
+    endereco: Endereco | None = None
 
 
 class EmpresaConfig(BaseModel):

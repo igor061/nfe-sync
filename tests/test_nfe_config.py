@@ -3,33 +3,28 @@ from nfe_sync.config import carregar_empresas, _parse_homologacao
 from nfe_sync.exceptions import NfeConfigError
 
 
-INI_COMPLETO = """\
+INI_MINIMO = """\
 [SUL]
 path = /tmp/cert.pfx
 senha = 123456
 uf = sp
 homologacao = true
 cnpj = 99999999000191
+"""
+
+INI_COMPLETO = INI_MINIMO + """\
 razao_social = EMPRESA TESTE LTDA
 nome_fantasia = EMPRESA TESTE
 inscricao_estadual = 111111111111
 cnae_fiscal = 4783101
 regime_tributario = 1
-logradouro = RUA EXEMPLO
-numero = 100
-complemento = SALA 01
-bairro = CENTRO
-municipio = SAO PAULO
-cod_municipio = 3550308
-endereco_uf = SP
-cep = 01310100
 """
 
 
 class TestCarregarEmpresas:
-    def test_carregar_config_valido(self, tmp_path):
+    def test_carregar_config_minimo(self, tmp_path):
         ini = tmp_path / "test.ini"
-        ini.write_text(INI_COMPLETO)
+        ini.write_text(INI_MINIMO)
         empresas = carregar_empresas(str(ini))
         assert "SUL" in empresas
         emp = empresas["SUL"]
@@ -39,7 +34,13 @@ class TestCarregarEmpresas:
         assert emp.uf == "sp"
         assert emp.homologacao is True
         assert emp.emitente.cnpj == "99999999000191"
-        assert emp.emitente.endereco.municipio == "SAO PAULO"
+
+    def test_carregar_config_completo(self, tmp_path):
+        ini = tmp_path / "test.ini"
+        ini.write_text(INI_COMPLETO)
+        emp = carregar_empresas(str(ini))["SUL"]
+        assert emp.emitente.razao_social == "EMPRESA TESTE LTDA"
+        assert emp.emitente.inscricao_estadual == "111111111111"
 
     def test_carregar_config_vazio(self, tmp_path):
         ini = tmp_path / "vazio.ini"
