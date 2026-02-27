@@ -1,7 +1,10 @@
 import argparse
+import configparser
 import sys
 
 from .exceptions import ApiConfigError
+
+INI_FILE = "nfe-sync.conf.ini"
 
 
 def cmd_cnpja(args):
@@ -36,6 +39,49 @@ def cmd_cnpja(args):
             print(f"  {s.nome} ({s.tipo}) - {s.qualificacao}")
 
 
+def _salvar_ini(empresa, nome_secao: str):
+    cfg = configparser.ConfigParser()
+    cfg.read(INI_FILE)
+
+    acao = "Atualizada" if cfg.has_section(nome_secao) else "Criada"
+    if not cfg.has_section(nome_secao):
+        cfg.add_section(nome_secao)
+
+    end = empresa.endereco
+    ie_ativa = next((ie for ie in empresa.inscricoes_estaduais if ie.ativo), None)
+
+    # preserva path e senha se a secao ja existia
+    if not cfg.get(nome_secao, "path", fallback=""):
+        cfg.set(nome_secao, "path", "certs/certificado.pfx")
+    if not cfg.get(nome_secao, "senha", fallback=""):
+        cfg.set(nome_secao, "senha", "")
+    if not cfg.get(nome_secao, "homologacao", fallback=""):
+        cfg.set(nome_secao, "homologacao", "true")
+
+    cfg.set(nome_secao, "uf", end.uf.lower())
+    cfg.set(nome_secao, "cnpj", empresa.cnpj)
+    cfg.set(nome_secao, "razao_social", empresa.razao_social)
+    cfg.set(nome_secao, "nome_fantasia", empresa.nome_fantasia)
+    cfg.set(nome_secao, "inscricao_estadual", ie_ativa.inscricao_estadual if ie_ativa else "")
+    cfg.set(nome_secao, "cnae_fiscal", str(empresa.cnae_fiscal))
+    cfg.set(nome_secao, "regime_tributario", cfg.get(nome_secao, "regime_tributario", fallback="1"))
+    cfg.set(nome_secao, "logradouro", end.logradouro)
+    cfg.set(nome_secao, "numero", end.numero)
+    cfg.set(nome_secao, "complemento", end.complemento or "")
+    cfg.set(nome_secao, "bairro", end.bairro)
+    cfg.set(nome_secao, "municipio", end.municipio)
+    cfg.set(nome_secao, "cod_municipio", "")
+    cfg.set(nome_secao, "endereco_uf", end.uf.upper())
+    cfg.set(nome_secao, "cep", str(end.cep))
+
+    with open(INI_FILE, "w") as f:
+        cfg.write(f)
+
+    print(f"{acao} secao [{nome_secao}] em {INI_FILE}")
+    if not cfg.get(nome_secao, "path", fallback=""):
+        print(f"  Atenção: preencha 'path' e 'senha' do certificado em {INI_FILE}")
+
+
 def cmd_cnpjws(args):
     from .cnpjws import consultar
 
@@ -56,16 +102,19 @@ def cmd_cnpjws(args):
             ativo = "ativa" if ie.ativo else "inativa"
             print(f"  {ie.uf}: {ie.inscricao_estadual} ({ativo})")
 
+    if args.salvar_ini:
+        _salvar_ini(empresa, args.salvar_ini)
+
 
 def cli(argv=None):
-    parser = argparse.ArgumentParser(prog="api", description="CLI para consulta de APIs externas")
+    parser = argparse.ArgumentParser(prog="api_cli", description="CLI para consulta de APIs externas")
     sub = parser.add_subparsers(dest="comando", required=True)
 
     # cnpja
     p_cnpja = sub.add_parser(
         "cnpja",
         help="Consultar CNPJ via CNPJa (open.cnpja.com)",
-        epilog="Exemplo: api cnpja 33.000.167/0001-01",
+        epilog="Exemplo: api_cli cnpja 33.000.167/0001-01",
     )
     p_cnpja.add_argument("cnpj", help="CNPJ a consultar (com ou sem formatacao)")
     p_cnpja.set_defaults(func=cmd_cnpja)
@@ -74,9 +123,15 @@ def cli(argv=None):
     p_cnpjws = sub.add_parser(
         "cnpjws",
         help="Consultar CNPJ via publica.cnpj.ws (inclui inscricao estadual)",
-        epilog="Exemplo: api cnpjws 33.000.167/0001-01",
+        epilog="Exemplo: api_cli cnpjws 33.000.167/0001-01 --salvar-ini MINHAEMPRESA",
     )
     p_cnpjws.add_argument("cnpj", help="CNPJ a consultar (com ou sem formatacao)")
+    p_cnpjws.add_argument(
+        "--salvar-ini",
+        metavar="NOME",
+        default=None,
+        help=f"Cria ou atualiza secao no {INI_FILE} com os dados consultados",
+    )
     p_cnpjws.set_defaults(func=cmd_cnpjws)
 
     args = parser.parse_args(argv)

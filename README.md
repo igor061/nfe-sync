@@ -7,7 +7,7 @@ Biblioteca Python e CLI para emissão, consulta, manifestação e inutilização
 ### Pacote instalado via pip
 
 ```bash
-pip install git+https://github.com/seu-usuario/nfe-sync.git
+pip install git+https://github.com/igor061/nfe-sync.git
 ```
 
 Os comandos `nfe-sync` e `api_cli` ficam disponíveis diretamente no terminal:
@@ -20,7 +20,7 @@ api_cli --help
 ### Modo desenvolvimento (clone do repositório)
 
 ```bash
-git clone https://github.com/seu-usuario/nfe-sync.git
+git clone https://github.com/igor061/nfe-sync.git
 cd nfe-sync
 pip install -e ".[dev]"
 ```
@@ -39,6 +39,10 @@ Copie o arquivo de exemplo e preencha com os dados da sua empresa:
 ```bash
 cp nfe-sync.conf.ini.example nfe-sync.conf.ini
 ```
+
+> **Dica:** use `api_cli cnpjws <cnpj> --salvar-ini NOME` para preencher automaticamente
+> os dados cadastrais da empresa no `nfe-sync.conf.ini`. Após isso, preencha manualmente
+> apenas `path` (caminho do certificado .pfx) e `senha`.
 
 Cada seção do arquivo representa uma empresa:
 
@@ -121,6 +125,9 @@ api_cli cnpja 33000167000101
 
 # publica.cnpj.ws — inclui inscrições estaduais por UF
 api_cli cnpjws 33000167000101
+
+# Consultar e já salvar no nfe-sync.conf.ini
+api_cli cnpjws 33000167000101 --salvar-ini MINHAEMPRESA
 ```
 
 ## Requisitos
