@@ -216,12 +216,6 @@ def cli(argv=None):
     amb.add_argument("--homologacao", action="store_true", help="Forcar ambiente de homologacao")
     sub = parser.add_subparsers(dest="comando", required=True)
 
-    # emitir
-    p_emitir = sub.add_parser("emitir", help="Emitir NF-e")
-    p_emitir.add_argument("empresa", help="Nome da empresa (secao no .ini)")
-    p_emitir.add_argument("--serie", required=True, help="Serie da NF-e")
-    p_emitir.set_defaults(func=cmd_emitir)
-
     # consultar
     p_consultar = sub.add_parser("consultar", help="Consultar NF-e")
     p_consultar.add_argument("empresa", help="Nome da empresa (secao no .ini)")

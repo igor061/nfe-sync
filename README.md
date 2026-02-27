@@ -61,12 +61,6 @@ razao_social = EMPRESA EXEMPLO LTDA
 
 > Em modo desenvolvimento substitua `nfe-sync` por `./run_nfesync` e `api_cli` por `./run_api_cli`.
 
-### Emitir NF-e
-
-```bash
-nfe-sync emitir MINHAEMPRESA --serie 1
-```
-
 ### Consultar situação por chave
 
 ```bash
