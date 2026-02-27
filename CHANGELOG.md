@@ -1,7 +1,10 @@
+# Changelog
+
+## 0.2.7
+- adicionar comandos versao e atualizar, CHANGELOG automatico e novidades no check de update
+
 ## 0.2.6
 - adicionar --zerar-nsu ao consultar-nsu e documentar no README
-
-# Changelog
 
 ## 0.2.5
 - Adicionado `--zerar-nsu` ao `consultar-nsu` para baixar NF-es dos últimos 90 dias
