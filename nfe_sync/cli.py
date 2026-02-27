@@ -12,6 +12,7 @@ from .state import (
     salvar_estado,
     get_ultimo_numero_nf,
     set_ultimo_numero_nf,
+    set_ultimo_nsu,
 )
 from .exceptions import NfeConfigError, NfeValidationError
 
@@ -132,6 +133,12 @@ def cmd_consultar_nsu(args):
     cnpj = empresa.emitente.cnpj
     nsu = args.nsu
 
+    if args.zerar_nsu:
+        set_ultimo_nsu(estado, cnpj, 0)
+        salvar_estado(STATE_FILE, estado)
+        nsu = 0
+        print(f"NSU zerado para {cnpj}.")
+
     print(f"Empresa: {empresa.nome} (CNPJ {cnpj})")
     print(f"Ambiente: {'Homologacao' if empresa.homologacao else 'Producao'}")
     print(f"Consultando distribuicao DFe (NSU: {nsu if nsu is not None else 'ultimo salvo'})...")
@@ -226,6 +233,7 @@ def cli(argv=None):
     p_nsu = sub.add_parser("consultar-nsu", help="Consultar distribuicao DFe por NSU")
     p_nsu.add_argument("empresa", help="Nome da empresa (secao no .ini)")
     p_nsu.add_argument("--nsu", type=int, default=None, help="NSU inicial (default: ultimo salvo)")
+    p_nsu.add_argument("--zerar-nsu", action="store_true", help="Zera o NSU salvo antes de consultar")
     p_nsu.set_defaults(func=cmd_consultar_nsu)
 
     # manifestar

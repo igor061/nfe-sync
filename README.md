@@ -81,7 +81,12 @@ nfe-sync consultar-nsu MINHAEMPRESA
 
 # A partir de um NSU específico
 nfe-sync consultar-nsu MINHAEMPRESA --nsu 0
+
+# Zera o NSU e recomeça do início (busca NF-es dos últimos 90 dias)
+nfe-sync consultar-nsu MINHAEMPRESA --zerar-nsu
 ```
+
+> **`--zerar-nsu`:** permite baixar todas as NF-es dos últimos 90 dias disponíveis no SEFAZ, útil na primeira execução ou para reprocessar o histórico. O SEFAZ pode retornar erro 656 (uso indevido) na primeira tentativa, bloqueando as consultas por 1 a 4 horas. Após o bloqueio expirar, as consultas voltam a funcionar normalmente e todos os documentos disponíveis serão baixados.
 
 ### Manifestar destinatário
 
