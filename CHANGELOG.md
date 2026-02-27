@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.8
+- corrigir estrutura do CHANGELOG.md: header no topo
+
 ## 0.2.7
 - adicionar comandos versao e atualizar, CHANGELOG automatico e novidades no check de update
 

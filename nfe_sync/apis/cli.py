@@ -107,14 +107,26 @@ def cmd_cnpjws(args):
 
 
 def cli(argv=None):
-    parser = argparse.ArgumentParser(prog="api_cli", description="CLI para consulta de APIs externas")
+    parser = argparse.ArgumentParser(
+        prog="api_cli",
+        description="Consulta de dados cadastrais de CNPJ via APIs publicas.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Exemplos de uso:\n"
+            "  api_cli cnpja  33000167000101\n"
+            "  api_cli cnpjws 33000167000101\n"
+            f"  api_cli cnpjws 33000167000101 --salvar-ini MINHAEMPRESA"
+        ),
+    )
     sub = parser.add_subparsers(dest="comando", required=True)
 
     # cnpja
     p_cnpja = sub.add_parser(
         "cnpja",
-        help="Consultar CNPJ via CNPJa (open.cnpja.com)",
-        epilog="Exemplo: api_cli cnpja 33.000.167/0001-01",
+        help="Consultar CNPJ via CNPJa — dados cadastrais, CNAE, socios, endereco",
+        description="Consulta dados cadastrais de um CNPJ usando a API open.cnpja.com.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Exemplo:\n  api_cli cnpja 33000167000101",
     )
     p_cnpja.add_argument("cnpj", help="CNPJ a consultar (com ou sem formatacao)")
     p_cnpja.set_defaults(func=cmd_cnpja)
@@ -122,15 +134,21 @@ def cli(argv=None):
     # cnpjws
     p_cnpjws = sub.add_parser(
         "cnpjws",
-        help="Consultar CNPJ via publica.cnpj.ws (inclui inscricao estadual)",
-        epilog="Exemplo: api_cli cnpjws 33.000.167/0001-01 --salvar-ini MINHAEMPRESA",
+        help="Consultar CNPJ via publica.cnpj.ws — inclui inscricoes estaduais por UF",
+        description="Consulta dados cadastrais de um CNPJ usando a API publica.cnpj.ws, incluindo inscricoes estaduais.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Exemplos:\n"
+            "  api_cli cnpjws 33000167000101\n"
+            f"  api_cli cnpjws 33000167000101 --salvar-ini MINHAEMPRESA"
+        ),
     )
     p_cnpjws.add_argument("cnpj", help="CNPJ a consultar (com ou sem formatacao)")
     p_cnpjws.add_argument(
         "--salvar-ini",
         metavar="NOME",
         default=None,
-        help=f"Cria ou atualiza secao no {INI_FILE} com os dados consultados",
+        help=f"Cria ou atualiza secao [{INI_FILE}] com os dados consultados (preenche automaticamente os campos cadastrais)",
     )
     p_cnpjws.set_defaults(func=cmd_cnpjws)
 

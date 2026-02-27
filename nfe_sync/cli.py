@@ -305,48 +305,110 @@ def cmd_inutilizar(args):
 
 
 def cli(argv=None):
-    parser = argparse.ArgumentParser(prog="nfe-sync", description="NF-e Sync CLI")
+    parser = argparse.ArgumentParser(
+        prog="nfe-sync",
+        description="Integracao direta com a SEFAZ: consulta, manifestacao e inutilizacao de NF-e.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Exemplos de uso:\n"
+            "  nfe-sync consultar      EMPRESA 12345678901234567890123456789012345678901234\n"
+            "  nfe-sync consultar-nsu  EMPRESA\n"
+            "  nfe-sync consultar-nsu  EMPRESA --nsu 0\n"
+            "  nfe-sync consultar-nsu  EMPRESA --zerar-nsu\n"
+            "  nfe-sync manifestar     EMPRESA ciencia CHAVE\n"
+            "  nfe-sync manifestar     EMPRESA nao_realizada CHAVE --justificativa 'Motivo'\n"
+            "  nfe-sync inutilizar     EMPRESA --serie 1 --inicio 5 --fim 8 --justificativa 'Motivo'\n"
+            "  nfe-sync versao\n"
+            "  nfe-sync atualizar\n"
+        ),
+    )
     amb = parser.add_mutually_exclusive_group()
     amb.add_argument("--producao", action="store_true", help="Forcar ambiente de producao")
     amb.add_argument("--homologacao", action="store_true", help="Forcar ambiente de homologacao")
     sub = parser.add_subparsers(dest="comando", required=True)
 
     # consultar
-    p_consultar = sub.add_parser("consultar", help="Consultar NF-e")
-    p_consultar.add_argument("empresa", help="Nome da empresa (secao no .ini)")
-    p_consultar.add_argument("chave", help="Chave de acesso (44 digitos)")
+    p_consultar = sub.add_parser(
+        "consultar",
+        help="Consultar situacao de uma NF-e pela chave de acesso",
+        description="Consulta a situacao de uma NF-e diretamente na SEFAZ.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Exemplo:\n  nfe-sync consultar MINHAEMPRESA 12345678901234567890123456789012345678901234",
+    )
+    p_consultar.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
+    p_consultar.add_argument("chave", help="Chave de acesso com 44 digitos")
     p_consultar.set_defaults(func=cmd_consultar)
 
     # consultar-nsu
-    p_nsu = sub.add_parser("consultar-nsu", help="Consultar distribuicao DFe por NSU")
-    p_nsu.add_argument("empresa", help="Nome da empresa (secao no .ini)")
-    p_nsu.add_argument("--nsu", type=int, default=None, help="NSU inicial (default: ultimo salvo)")
-    p_nsu.add_argument("--zerar-nsu", action="store_true", help="Zera o NSU salvo antes de consultar")
+    p_nsu = sub.add_parser(
+        "consultar-nsu",
+        help="Baixar NF-e e eventos recebidos via distribuicao DFe (NSU)",
+        description="Consulta a distribuicao DFe na SEFAZ, baixando NF-e e eventos a partir do ultimo NSU salvo.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Exemplos:\n"
+            "  nfe-sync consultar-nsu MINHAEMPRESA\n"
+            "  nfe-sync consultar-nsu MINHAEMPRESA --nsu 0\n"
+            "  nfe-sync consultar-nsu MINHAEMPRESA --zerar-nsu"
+        ),
+    )
+    p_nsu.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
+    p_nsu.add_argument("--nsu", type=int, default=None, help="NSU inicial (padrao: ultimo NSU salvo)")
+    p_nsu.add_argument("--zerar-nsu", action="store_true", help="Zera o NSU salvo e recomeça do inicio (ultimos 90 dias)")
     p_nsu.set_defaults(func=cmd_consultar_nsu)
 
     # manifestar
-    p_manifestar = sub.add_parser("manifestar", help="Manifestar destinatario")
-    p_manifestar.add_argument("empresa", help="Nome da empresa (secao no .ini)")
-    p_manifestar.add_argument("operacao", choices=["ciencia", "confirmacao", "desconhecimento", "nao_realizada"])
-    p_manifestar.add_argument("chave", help="Chave de acesso (44 digitos)")
-    p_manifestar.add_argument("--justificativa", default="", help="Justificativa (obrigatoria para nao_realizada)")
+    p_manifestar = sub.add_parser(
+        "manifestar",
+        help="Manifestar ciencia, confirmacao, desconhecimento ou nao-realizacao",
+        description="Registra a manifestacao do destinatario para uma NF-e na SEFAZ.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=(
+            "Operacoes disponiveis:\n"
+            "  ciencia          Ciencia da operacao\n"
+            "  confirmacao      Confirmacao da operacao\n"
+            "  desconhecimento  Desconhecimento da operacao\n"
+            "  nao_realizada    Operacao nao realizada (requer --justificativa)\n\n"
+            "Exemplos:\n"
+            "  nfe-sync manifestar MINHAEMPRESA ciencia CHAVE\n"
+            "  nfe-sync manifestar MINHAEMPRESA nao_realizada CHAVE --justificativa 'Mercadoria nao entregue'"
+        ),
+    )
+    p_manifestar.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
+    p_manifestar.add_argument("operacao", choices=["ciencia", "confirmacao", "desconhecimento", "nao_realizada"], help="Tipo de manifestacao")
+    p_manifestar.add_argument("chave", help="Chave de acesso com 44 digitos")
+    p_manifestar.add_argument("--justificativa", default="", help="Justificativa (obrigatoria para nao_realizada, minimo 15 caracteres)")
     p_manifestar.set_defaults(func=cmd_manifestar)
 
     # inutilizar
-    p_inutilizar = sub.add_parser("inutilizar", help="Inutilizar numeracao")
-    p_inutilizar.add_argument("empresa", help="Nome da empresa (secao no .ini)")
+    p_inutilizar = sub.add_parser(
+        "inutilizar",
+        help="Inutilizar faixa de numeracao de NF-e",
+        description="Inutiliza uma faixa de numeros de NF-e na SEFAZ.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Exemplo:\n  nfe-sync inutilizar MINHAEMPRESA --serie 1 --inicio 5 --fim 8 --justificativa 'Numeracao nao utilizada'",
+    )
+    p_inutilizar.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
     p_inutilizar.add_argument("--serie", required=True, help="Serie da NF-e")
-    p_inutilizar.add_argument("--inicio", required=True, type=int, help="Numero inicial")
-    p_inutilizar.add_argument("--fim", required=True, type=int, help="Numero final")
-    p_inutilizar.add_argument("--justificativa", required=True, help="Justificativa (min 15 chars)")
+    p_inutilizar.add_argument("--inicio", required=True, type=int, help="Numero inicial da faixa")
+    p_inutilizar.add_argument("--fim", required=True, type=int, help="Numero final da faixa")
+    p_inutilizar.add_argument("--justificativa", required=True, help="Justificativa da inutilizacao (minimo 15 caracteres)")
     p_inutilizar.set_defaults(func=cmd_inutilizar)
 
     # versao
-    p_versao = sub.add_parser("versao", help="Exibe versao instalada e verifica atualizacoes")
+    p_versao = sub.add_parser(
+        "versao",
+        help="Exibir versao instalada e verificar atualizacoes disponiveis",
+        description="Exibe a versao instalada e verifica se ha uma versao mais recente no repositorio.",
+    )
     p_versao.set_defaults(func=cmd_versao)
 
     # atualizar
-    p_atualizar = sub.add_parser("atualizar", help="Atualiza o nfe-sync para a versao mais recente")
+    p_atualizar = sub.add_parser(
+        "atualizar",
+        help="Atualizar o nfe-sync para a versao mais recente",
+        description="Atualiza o nfe-sync para a versao mais recente disponivel no repositorio.",
+    )
     p_atualizar.set_defaults(func=cmd_atualizar)
 
     args = parser.parse_args(argv)
