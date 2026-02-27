@@ -94,12 +94,15 @@ nfe-sync --homologacao emitir MINHAEMPRESA --serie 1
 ## Consulta de CNPJ
 
 ```bash
-# API pública (sem configuração)
+# CNPJá — dados cadastrais, CNAE, sócios, endereço (open.cnpja.com)
 api cnpja 33000167000101
 
-# Com chave da CNPJá (configure apis.json)
+# Com chave da CNPJá (configure apis.json para remover limite de requisições)
 cp apis.json.example apis.json
 api cnpja 33000167000101
+
+# publica.cnpj.ws — inclui inscrições estaduais por UF
+api cnpjws 33000167000101
 ```
 
 ## Requisitos
