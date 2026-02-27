@@ -1,5 +1,5 @@
 .env
-.certs.ini
+nfe-sync.conf.ini
 .state.json
 *.pfx
 *.p12

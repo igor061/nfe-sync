@@ -15,7 +15,7 @@ from .state import (
 )
 from .exceptions import NfeConfigError, NfeValidationError
 
-CONFIG_FILE = ".certs.ini"
+CONFIG_FILE = "nfe-sync.conf.ini"
 STATE_FILE = ".state.json"
 
 
