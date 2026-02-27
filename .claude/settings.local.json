@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:pynfe.readthedocs.io)",
+      "WebFetch(domain:pypi.org)",
+      "Bash(pyenv activate:*)",
+      "Bash(./utils/pyrun.sh:*)",
+      "WebFetch(domain:www.projetoacbr.com.br)",
+      "WebFetch(domain:blog.tecnospeed.com.br)",
+      "WebFetch(domain:atendimento.tecnospeed.com.br)",
+      "WebFetch(domain:flexdocs.net)",
+      "Bash(eval $\\(pyenv init -\\):*)",
+      "Bash(find:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

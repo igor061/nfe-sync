@@ -1,0 +1,12 @@
+.env
+.certs.ini
+.state.json
+*.pfx
+*.p12
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+certs/
+downloads/
+xml/

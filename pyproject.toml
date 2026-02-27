@@ -1,0 +1,14 @@
+[project]
+name = "nfe-sync"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["pynfe>=0.6.5", "python-dotenv", "pydantic>=2.0"]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[project.scripts]
+nfe-sync = "nfe_sync.cli:cli"
+
+[tool.setuptools.packages.find]
+include = ["nfe_sync*"]
