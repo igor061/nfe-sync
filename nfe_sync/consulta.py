@@ -224,11 +224,10 @@ def consultar_nsu(
         if ult_nsu >= max_nsu:
             break
 
-    # 137 = fila esgotada, 656 = consumo indevido, outros = erro
-    # Em todos os casos aplica cooldown para evitar nova rejeição imediata
-    set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
-    if state_file:
-        salvar_estado(state_file, estado)
+    if c_stat == "137":
+        set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
+        if state_file:
+            salvar_estado(state_file, estado)
 
     return {
         "sucesso": c_stat in ("137", "138"),

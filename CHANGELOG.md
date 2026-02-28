@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.44
+- fix: aplicar cooldown apenas para status 137 (fila esgotada)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.43
 - fix: aplicar cooldown apos qualquer consulta NSU, incluindo 137 (fila esgotada)\012\012Antes o cooldown so era setado para status de erro (nao 137/138).\012Agora e sempre aplicado, evitando rejeicao 656 por consumo indevido\012quando a fila esta vazia e o processo chama novamente em seguida.\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
