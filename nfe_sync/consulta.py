@@ -112,6 +112,7 @@ def _processar_docs(xml_resp, documentos, cnpj: str):
             xml_str = etree.tostring(xml_doc, encoding="unicode", pretty_print=True)
             nome, chave = nome_arquivo_nsu(xml_doc, schema, doc_nsu)
             arquivo = f"downloads/{cnpj}/{nome}.xml"
+            substituiu_resumo = os.path.exists(arquivo) and "procNFe" in schema
             with open(arquivo, "w") as f:
                 f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
                 f.write(xml_str)
@@ -120,6 +121,7 @@ def _processar_docs(xml_resp, documentos, cnpj: str):
                 "chave": chave,
                 "schema": schema,
                 "arquivo": arquivo,
+                "substituiu_resumo": substituiu_resumo,
             })
         except Exception as e:
             documentos.append({
@@ -127,6 +129,29 @@ def _processar_docs(xml_resp, documentos, cnpj: str):
                 "schema": schema,
                 "erro": str(e),
             })
+
+
+def listar_resumos_pendentes(cnpj: str) -> list[str]:
+    """Retorna chaves dos resNFe pendentes em downloads/{cnpj}/."""
+    pasta = f"downloads/{cnpj}"
+    if not os.path.isdir(pasta):
+        return []
+    resumos = []
+    for nome in os.listdir(pasta):
+        if not nome.endswith(".xml"):
+            continue
+        # chave tem 44 digitos; resNFe salvo como {chave}.xml = 48 chars
+        if len(nome) != 48:
+            continue
+        try:
+            tree = etree.parse(os.path.join(pasta, nome))
+            root = tree.getroot()
+            local = root.tag.split("}")[-1] if "}" in root.tag else root.tag
+            if local == "resNFe":
+                resumos.append(nome[:-4])
+        except Exception:
+            pass
+    return resumos
 
 
 def consultar_nsu(

@@ -254,7 +254,7 @@ def cmd_consultar_nsu(args):
     def progresso(pagina, total_docs, ult_nsu, max_nsu):
         print(f"  Pagina {pagina}: {total_docs} docs ate agora (NSU {ult_nsu}/{max_nsu})")
 
-    from .consulta import consultar_nsu
+    from .consulta import consultar_nsu, listar_resumos_pendentes
     resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu, callback=progresso)
 
     if not resultado.get("sucesso") and "motivo" in resultado and not resultado.get("status"):
@@ -270,7 +270,6 @@ def cmd_consultar_nsu(args):
         print(f"Resposta salva em: {arq}")
 
     docs = resultado.get("documentos", [])
-    resumos = []
     if docs:
         print(f"Documentos: {len(docs)}")
         for doc in docs:
@@ -279,17 +278,69 @@ def cmd_consultar_nsu(args):
             else:
                 chave = doc.get("chave") or doc["nsu"]
                 schema = doc['schema']
-                tipo = "XML completo" if "procNFe" in schema else "resumo"
+                if "procNFe" in schema and doc.get("substituiu_resumo"):
+                    tipo = "XML completo (substituiu resumo)"
+                elif "procNFe" in schema:
+                    tipo = "XML completo"
+                else:
+                    tipo = "resumo"
                 print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {doc['arquivo']}")
-                if "resNFe" in schema and chave != doc["nsu"]:
-                    resumos.append((chave, args.empresa))
 
-    if resumos:
+    # verifica resNFe pendentes no disco (run atual + runs anteriores)
+    pendentes = listar_resumos_pendentes(cnpj)
+    if pendentes:
         print()
-        print("Para baixar o XML completo das NF-es acima, registre ciencia e consulte novamente:")
-        for chave, emp in resumos:
-            print(f"  nfe-sync manifestar {emp} ciencia {chave}")
-        print(f"  nfe-sync consultar-nsu {args.empresa}")
+        print(f"NF-e com resumo pendente — {len(pendentes)} chave(s) aguardando XML completo:")
+        for chave in pendentes:
+            print(f"  {chave}")
+        print()
+        try:
+            resposta = input("Registrar ciencia e baixar XML completo para todas? [s/N] ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            resposta = ""
+        if resposta == "s":
+            from .manifestacao import manifestar
+            print()
+            print("Registrando ciencia da operacao...")
+            for chave in pendentes:
+                try:
+                    res = manifestar(empresa, "ciencia", chave, "")
+                    for r in res["resultados"]:
+                        print(f"  {chave[:8]}...  cStat={r['status']}  {r['motivo']}")
+                except Exception as e:
+                    print(f"  {chave[:8]}...  ERRO: {e}")
+            print()
+            print("Consultando novamente para baixar XML completo...")
+            from .state import carregar_estado
+            estado2 = carregar_estado(STATE_FILE)
+            resultado2 = consultar_nsu(empresa, estado2, STATE_FILE, callback=progresso)
+            print(f"Status: {resultado2.get('status')}")
+            print(f"Motivo: {resultado2.get('motivo')}")
+            docs2 = resultado2.get("documentos", [])
+            completos = []
+            if docs2:
+                print(f"Documentos: {len(docs2)}")
+                for doc in docs2:
+                    if "erro" in doc:
+                        print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
+                    else:
+                        chave = doc.get("chave") or doc["nsu"]
+                        schema = doc['schema']
+                        if "procNFe" in schema and doc.get("substituiu_resumo"):
+                            tipo = "XML completo (substituiu resumo)"
+                            completos.append(chave)
+                        elif "procNFe" in schema:
+                            tipo = "XML completo"
+                        else:
+                            tipo = "resumo"
+                        print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {doc['arquivo']}")
+            if completos:
+                print()
+                print(f"XML completo baixado para {len(completos)} NF-e(s).")
+            ainda_pendentes = listar_resumos_pendentes(cnpj)
+            if ainda_pendentes:
+                print()
+                print(f"Ainda ha {len(ainda_pendentes)} resumo(s) pendente(s). Execute novamente para tentar novamente.")
 
 
 def cmd_manifestar(args):
