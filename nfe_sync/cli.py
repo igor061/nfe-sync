@@ -224,7 +224,15 @@ def cmd_consultar(args):
         print(f"  cStat={sit['status']}  {sit['motivo']}")
 
     if resultado["arquivo"]:
-        print(f"  XML salvo em: {resultado['arquivo']}")
+        print(f"  Protocolo salvo em: {resultado['arquivo']}")
+    else:
+        primeiro_stat = resultado["situacao"][0]["status"] if resultado["situacao"] else ""
+        if primeiro_stat.startswith("1"):
+            print()
+            print("  Nota: este comando retorna apenas o protocolo de autorizacao.")
+            print("  Para baixar o XML completo da NF-e use o fluxo:")
+            print(f"    1. nfe-sync manifestar {args.empresa} ciencia {args.chave}")
+            print(f"    2. nfe-sync consultar-nsu {args.empresa}")
 
 
 def cmd_consultar_nsu(args):
@@ -262,6 +270,7 @@ def cmd_consultar_nsu(args):
         print(f"Resposta salva em: {arq}")
 
     docs = resultado.get("documentos", [])
+    resumos = []
     if docs:
         print(f"Documentos: {len(docs)}")
         for doc in docs:
@@ -269,7 +278,18 @@ def cmd_consultar_nsu(args):
                 print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
             else:
                 chave = doc.get("chave") or doc["nsu"]
-                print(f"  NSU {doc['nsu']} ({doc['schema']}) chave={chave} — {doc['arquivo']}")
+                schema = doc['schema']
+                tipo = "XML completo" if "procNFe" in schema else "resumo"
+                print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {doc['arquivo']}")
+                if "resNFe" in schema and chave != doc["nsu"]:
+                    resumos.append((chave, args.empresa))
+
+    if resumos:
+        print()
+        print("Para baixar o XML completo das NF-es acima, registre ciencia e consulte novamente:")
+        for chave, emp in resumos:
+            print(f"  nfe-sync manifestar {emp} ciencia {chave}")
+        print(f"  nfe-sync consultar-nsu {args.empresa}")
 
 
 def cmd_manifestar(args):

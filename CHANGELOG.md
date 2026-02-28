@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.20
+- explicar fluxo para download do XML completo apos consultar e consultar-nsu
+
 ## 0.2.19
 - confirmar estabilidade do hook de versao
 
