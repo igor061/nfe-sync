@@ -187,8 +187,18 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     arquivo_resp = salvar_resposta_sefaz(xml_resp, "dist-dfe-chave", chave)
 
     documentos = []
+    arquivo_cancelada = None
     if c_stat == "138":
         _processar_docs(xml_resp, documentos, cnpj)
+    elif c_stat == "653":
+        arquivo_cancelada = f"downloads/{cnpj}/{chave}-cancelada.xml"
+        xml_str = etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
+        with open(arquivo_cancelada, "w") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write(xml_str)
+        resumo = f"downloads/{cnpj}/{chave}.xml"
+        if os.path.exists(resumo):
+            os.remove(resumo)
 
     return {
         "sucesso": c_stat == "138",
@@ -196,6 +206,7 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
         "motivo": x_motivo,
         "documentos": documentos,
         "resposta": arquivo_resp,
+        "arquivo_cancelada": arquivo_cancelada,
     }
 
 

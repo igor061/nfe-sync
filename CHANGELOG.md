@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.26
+- salvar registro de cancelamento (653) e remover resNFe pendente\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.25
 - consultar-nsu --chave: baixar procNFe diretamente pela chave sem avançar NSU\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
