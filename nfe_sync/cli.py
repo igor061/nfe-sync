@@ -434,29 +434,42 @@ def cli(argv=None):
         description="Integracao direta com a SEFAZ: consulta, manifestacao e inutilizacao de NF-e.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Exemplos de uso:\n"
+            "Comandos SEFAZ:\n"
+            "  consultar       Consultar situacao de uma NF-e pela chave de acesso\n"
+            "  consultar-nsu   Baixar NF-e e eventos recebidos via distribuicao DFe\n"
+            "  pendentes       Listar NF-e com resumo pendente aguardando XML completo\n"
+            "  manifestar      Manifestar ciencia, confirmacao, desconhecimento ou nao-realizacao\n"
+            "  inutilizar      Inutilizar faixa de numeracao de NF-e\n"
+            "\n"
+            "Sistema:\n"
+            "  versao          Verificar versao instalada e atualizacoes disponiveis\n"
+            "  atualizar       Atualizar para a versao mais recente\n"
+            "  readme          Exibir documentacao completa\n"
+            "\n"
+            "Exemplos:\n"
             "  nfe-sync consultar      EMPRESA 12345678901234567890123456789012345678901234\n"
             "  nfe-sync consultar-nsu  EMPRESA\n"
-            "  nfe-sync consultar-nsu  EMPRESA --nsu 0\n"
-            "  nfe-sync consultar-nsu  EMPRESA --zerar-nsu\n"
+            "  nfe-sync consultar-nsu  EMPRESA --chave CHAVE\n"
             "  nfe-sync pendentes      EMPRESA\n"
             "  nfe-sync manifestar     EMPRESA ciencia CHAVE\n"
-            "  nfe-sync manifestar     EMPRESA nao_realizada CHAVE --justificativa 'Motivo'\n"
             "  nfe-sync inutilizar     EMPRESA --serie 1 --inicio 5 --fim 8 --justificativa 'Motivo'\n"
-            "  nfe-sync versao\n"
-            "  nfe-sync atualizar\n"
-            "  nfe-sync readme\n"
         ),
     )
     amb = parser.add_mutually_exclusive_group()
     amb.add_argument("--producao", action="store_true", help="Forcar ambiente de producao")
     amb.add_argument("--homologacao", action="store_true", help="Forcar ambiente de homologacao")
-    sub = parser.add_subparsers(dest="comando", required=True)
+    sub = parser.add_subparsers(dest="comando", required=True, metavar="<comando>")
+
+    # remove o grupo de subparsers do help (os grupos ficam no epilog formatado)
+    parser._action_groups = [
+        g for g in parser._action_groups
+        if not any(isinstance(a, argparse._SubParsersAction) for a in g._group_actions)
+    ]
 
     # consultar
     p_consultar = sub.add_parser(
         "consultar",
-        help="Consultar situacao de uma NF-e pela chave de acesso",
+        help=argparse.SUPPRESS,
         description="Consulta a situacao de uma NF-e diretamente na SEFAZ.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Exemplo:\n  nfe-sync consultar MINHAEMPRESA 12345678901234567890123456789012345678901234",
@@ -468,7 +481,7 @@ def cli(argv=None):
     # consultar-nsu
     p_nsu = sub.add_parser(
         "consultar-nsu",
-        help="Baixar NF-e e eventos recebidos via distribuicao DFe (NSU)",
+        help=argparse.SUPPRESS,
         description="Consulta a distribuicao DFe na SEFAZ, baixando NF-e e eventos a partir do ultimo NSU salvo.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -487,7 +500,7 @@ def cli(argv=None):
     # pendentes
     p_pendentes = sub.add_parser(
         "pendentes",
-        help="Listar NF-e com resumo pendente aguardando XML completo",
+        help=argparse.SUPPRESS,
         description="Lista as NF-e cujo resumo (resNFe) ja foi baixado mas o XML completo ainda nao foi obtido.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Exemplo:\n  nfe-sync pendentes MINHAEMPRESA",
@@ -498,7 +511,7 @@ def cli(argv=None):
     # manifestar
     p_manifestar = sub.add_parser(
         "manifestar",
-        help="Manifestar ciencia, confirmacao, desconhecimento ou nao-realizacao",
+        help=argparse.SUPPRESS,
         description="Registra a manifestacao do destinatario para uma NF-e na SEFAZ.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
@@ -521,7 +534,7 @@ def cli(argv=None):
     # inutilizar
     p_inutilizar = sub.add_parser(
         "inutilizar",
-        help="Inutilizar faixa de numeracao de NF-e",
+        help=argparse.SUPPRESS,
         description="Inutiliza uma faixa de numeros de NF-e na SEFAZ.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="Exemplo:\n  nfe-sync inutilizar MINHAEMPRESA --serie 1 --inicio 5 --fim 8 --justificativa 'Numeracao nao utilizada'",
@@ -536,7 +549,7 @@ def cli(argv=None):
     # versao
     p_versao = sub.add_parser(
         "versao",
-        help="Exibir versao instalada e verificar atualizacoes disponiveis",
+        help=argparse.SUPPRESS,
         description="Exibe a versao instalada e verifica se ha uma versao mais recente no repositorio.",
     )
     p_versao.set_defaults(func=cmd_versao)
@@ -544,7 +557,7 @@ def cli(argv=None):
     # atualizar
     p_atualizar = sub.add_parser(
         "atualizar",
-        help="Atualizar o nfe-sync para a versao mais recente",
+        help=argparse.SUPPRESS,
         description="Atualiza o nfe-sync para a versao mais recente disponivel no repositorio.",
     )
     p_atualizar.set_defaults(func=cmd_atualizar)
@@ -552,7 +565,7 @@ def cli(argv=None):
     # readme
     p_readme = sub.add_parser(
         "readme",
-        help="Exibir o README com a documentacao completa",
+        help=argparse.SUPPRESS,
         description="Exibe o README do repositorio com instrucoes de instalacao, configuracao e uso.",
     )
     p_readme.set_defaults(func=cmd_readme)

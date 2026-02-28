@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.28
+- separar help em grupos: Comandos SEFAZ e Sistema\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.27
 - cancelamento 653: renomear procNFe para -cancelada.xml e salvar -cancelamento.xml\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
