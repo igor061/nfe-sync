@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.46
+- fix: adicionar xml_utils.py ao git (esquecido no commit de criacao)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.45
 - fix: pular distribuicao DFe quando chave pertence ao proprio CNPJ da empresa\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
