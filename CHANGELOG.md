@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.17
+- bump versao para garantir atualizacao do fix de nao salvar XML em erros
+
 ## 0.2.16
 - nao salvar XML em downloads quando SEFAZ retornar erro ou rejeicao
 
