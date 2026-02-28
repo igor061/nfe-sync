@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.35
+- refactor: separa biblioteca da CLI — funções retornam XML em memória\012\012- consulta, manifestacao, inutilizacao, emissao: removidos import os,\012  salvar_resposta_sefaz e toda escrita em disco\012- Funções retornam xml/xml_resposta como strings prontas para persistir\012- consultar_nsu: state_file=None (opcional), retorna estado atualizado\012  e xmls_resposta; salva estado somente se state_file for fornecido\012- cli.py: helpers _salvar_xml, _salvar_log_xml, _listar_resumos_pendentes,\012  _tratar_arquivo_cancelado centralizam todo I/O de arquivo\012- __init__.py: expõe API pública (consultar, consultar_nsu, manifestar, etc.)\012- Comportamento da CLI idêntico ao anterior (67 testes passando)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.34
 - consultar: tentar baixar XML completo via DFe apos consulta de situacao\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 

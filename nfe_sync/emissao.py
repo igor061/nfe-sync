@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 from decimal import Decimal
 
@@ -12,7 +11,6 @@ from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 
 from .models import EmpresaConfig, DadosEmissao
-from .log import salvar_resposta_sefaz
 
 
 def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmissao) -> dict:
@@ -134,20 +132,13 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
         codigo = resposta[0]
         if codigo == 0:
             nfe_proc = resposta[1]
-            salvar_resposta_sefaz(nfe_proc, "emissao", cnpj)
             status = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:cStat", namespaces=ns)
             motivo = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:xMotivo", namespaces=ns)
             protocolo = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:nProt", namespaces=ns)
             chave = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:chNFe", namespaces=ns)
 
-            xml_final = etree.tostring(nfe_proc, encoding="unicode", pretty_print=True)
+            xml_final = '<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(nfe_proc, encoding="unicode", pretty_print=True)
             chave_txt = chave[0].text if chave else "nfe"
-
-            os.makedirs("xml", exist_ok=True)
-            arquivo = f"xml/{chave_txt}.xml"
-            with open(arquivo, "w") as f:
-                f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-                f.write(xml_final)
 
             return {
                 "sucesso": True,
@@ -155,22 +146,23 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
                 "motivo": motivo[0].text if motivo else None,
                 "protocolo": protocolo[0].text if protocolo else None,
                 "chave": chave_txt,
-                "arquivo": arquivo,
+                "xml": xml_final,
             }
         else:
             http_resp = resposta[1]
+            xml_resposta = None
             try:
                 body = etree.fromstring(
                     http_resp.content if hasattr(http_resp, "content") else http_resp
                 )
-                salvar_resposta_sefaz(body, "emissao-erro", cnpj)
                 stats = body.xpath("//ns:cStat", namespaces=ns)
                 motivos = body.xpath("//ns:xMotivo", namespaces=ns)
                 erros = [
                     {"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)
                 ]
+                xml_resposta = '<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(body, encoding="unicode", pretty_print=True)
             except Exception:
                 erros = [{"status": str(codigo), "motivo": "Erro ao parsear resposta"}]
-            return {"sucesso": False, "codigo": codigo, "erros": erros}
+            return {"sucesso": False, "codigo": codigo, "erros": erros, "xml_resposta": xml_resposta}
     else:
         return {"sucesso": False, "codigo": None, "resposta": str(resposta)}

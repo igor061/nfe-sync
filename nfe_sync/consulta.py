@@ -1,4 +1,3 @@
-import os
 from datetime import datetime, timedelta
 
 from pynfe.processamento.comunicacao import ComunicacaoSefaz
@@ -7,7 +6,6 @@ from pynfe.utils.descompactar import DescompactaGzip
 
 from .models import EmpresaConfig
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
-from .log import salvar_resposta_sefaz
 
 
 COOLDOWN_MINUTOS = 61
@@ -46,6 +44,10 @@ def calcular_proximo_cooldown(minutos: int = COOLDOWN_MINUTOS) -> str:
     return (datetime.now() + timedelta(minutes=minutos)).isoformat(timespec="seconds")
 
 
+def _xml_str(xml_el) -> str:
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(xml_el, encoding="unicode", pretty_print=True)
+
+
 def consultar(empresa: EmpresaConfig, chave: str) -> dict:
     uf = _uf_da_chave(chave) or empresa.uf
     con = ComunicacaoSefaz(
@@ -54,26 +56,19 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
 
     resp_sit = con.consulta_nota(modelo="nfe", chave=chave)
     xml_sit = etree.fromstring(resp_sit.content)
-    salvar_resposta_sefaz(xml_sit, "consulta", chave)
+    xml_resposta = _xml_str(xml_sit)
+
     stats = xml_sit.xpath("//ns:cStat", namespaces=NS)
     motivos = xml_sit.xpath("//ns:xMotivo", namespaces=NS)
     situacao = [{"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)]
 
-    # salva o XML apenas se a SEFAZ retornou um status de sucesso (1xx)
     primeiro_stat = situacao[0]["status"] if situacao else ""
-    arquivo = None
-    if primeiro_stat.startswith("1"):
-        cnpj = empresa.emitente.cnpj
-        os.makedirs(f"downloads/{cnpj}", exist_ok=True)
-        xml_sit_str = etree.tostring(xml_sit, encoding="unicode", pretty_print=True)
-        arquivo = f"downloads/{cnpj}/{chave}-situacao.xml"
-        with open(arquivo, "w") as f:
-            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-            f.write(xml_sit_str)
+    xml = xml_resposta if primeiro_stat.startswith("1") else None
 
     return {
         "situacao": situacao,
-        "arquivo": arquivo,
+        "xml": xml,
+        "xml_resposta": xml_resposta,
     }
 
 
@@ -115,8 +110,9 @@ def nome_arquivo_nsu(xml_doc, schema: str, fallback: str) -> tuple[str, str | No
     return nome, None
 
 
-def _processar_docs(xml_resp, documentos, cnpj: str):
+def _processar_docs(xml_resp) -> list[dict]:
     docs_xml = xml_resp.xpath("//ns:docZip", namespaces=NS)
+    documentos = []
 
     for doc in docs_xml:
         doc_nsu = doc.get("NSU", "")
@@ -125,17 +121,12 @@ def _processar_docs(xml_resp, documentos, cnpj: str):
             xml_doc = DescompactaGzip.descompacta(doc.text)
             xml_str = etree.tostring(xml_doc, encoding="unicode", pretty_print=True)
             nome, chave = nome_arquivo_nsu(xml_doc, schema, doc_nsu)
-            arquivo = f"downloads/{cnpj}/{nome}.xml"
-            substituiu_resumo = os.path.exists(arquivo) and "procNFe" in schema
-            with open(arquivo, "w") as f:
-                f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-                f.write(xml_str)
             documentos.append({
                 "nsu": doc_nsu,
                 "chave": chave,
                 "schema": schema,
-                "arquivo": arquivo,
-                "substituiu_resumo": substituiu_resumo,
+                "nome": f"{nome}.xml",
+                "xml": '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_str,
             })
         except Exception as e:
             documentos.append({
@@ -144,97 +135,54 @@ def _processar_docs(xml_resp, documentos, cnpj: str):
                 "erro": str(e),
             })
 
-
-def listar_resumos_pendentes(cnpj: str) -> list[str]:
-    """Retorna chaves dos resNFe pendentes em downloads/{cnpj}/."""
-    pasta = f"downloads/{cnpj}"
-    if not os.path.isdir(pasta):
-        return []
-    resumos = []
-    for nome in os.listdir(pasta):
-        if not nome.endswith(".xml"):
-            continue
-        # chave tem 44 digitos; resNFe salvo como {chave}.xml = 48 chars
-        if len(nome) != 48:
-            continue
-        try:
-            tree = etree.parse(os.path.join(pasta, nome))
-            root = tree.getroot()
-            local = root.tag.split("}")[-1] if "}" in root.tag else root.tag
-            if local == "resNFe":
-                resumos.append(nome[:-4])
-        except Exception:
-            pass
-    return resumos
+    return documentos
 
 
 def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     """Baixa o documento DFe (procNFe) diretamente pela chave de acesso."""
     cnpj = empresa.emitente.cnpj
-    # cUFAutor para consChNFe deve ser a UF do emitente (primeiros 2 digitos da chave)
     uf = _uf_da_chave(chave) or empresa.uf
     con = ComunicacaoSefaz(
         uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
     )
 
-    os.makedirs(f"downloads/{cnpj}", exist_ok=True)
     resp = con.consulta_distribuicao(cnpj=cnpj, chave=chave)
     xml_resp = etree.fromstring(resp.content if hasattr(resp, "content") else resp)
+    xml_resposta = _xml_str(xml_resp)
 
     status = xml_resp.xpath("//ns:cStat", namespaces=NS)
     motivo = xml_resp.xpath("//ns:xMotivo", namespaces=NS)
     c_stat = status[0].text if status else None
     x_motivo = motivo[0].text if motivo else None
 
-    arquivo_resp = salvar_resposta_sefaz(xml_resp, "dist-dfe-chave", chave)
-
     documentos = []
-    arquivo_cancelada = None
+    xml_cancelamento = None
+
     if c_stat == "138":
-        _processar_docs(xml_resp, documentos, cnpj)
+        documentos = _processar_docs(xml_resp)
     elif c_stat == "653":
-        # salva registro de cancelamento
-        arquivo_cancelamento = f"downloads/{cnpj}/{chave}-cancelamento.xml"
-        xml_str = etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
-        with open(arquivo_cancelamento, "w") as f:
-            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-            f.write(xml_str)
-        arquivo_cancelada = arquivo_cancelamento
-        # trata arquivo existente da NF-e
-        existente = f"downloads/{cnpj}/{chave}.xml"
-        if os.path.exists(existente):
-            try:
-                root_tag = etree.parse(existente).getroot().tag.split("}")[-1]
-            except Exception:
-                root_tag = ""
-            if root_tag == "resNFe":
-                os.remove(existente)
-            else:
-                # procNFe ou outro: renomeia para -cancelada.xml
-                os.rename(existente, f"downloads/{cnpj}/{chave}-cancelada.xml")
-                arquivo_cancelada = f"downloads/{cnpj}/{chave}-cancelada.xml"
+        xml_cancelamento = xml_resposta
 
     return {
         "sucesso": c_stat == "138",
         "status": c_stat,
         "motivo": x_motivo,
         "documentos": documentos,
-        "resposta": arquivo_resp,
-        "arquivo_cancelamento": arquivo_cancelamento if c_stat == "653" else None,
-        "arquivo_cancelada": f"downloads/{cnpj}/{chave}-cancelada.xml" if c_stat == "653" and os.path.exists(f"downloads/{cnpj}/{chave}-cancelada.xml") else None,
+        "xml_resposta": xml_resposta,
+        "xml_cancelamento": xml_cancelamento,
     }
 
 
 def consultar_nsu(
-    empresa: EmpresaConfig, estado: dict, state_file: str, nsu: int | None = None,
-    callback=None,
+    empresa: EmpresaConfig, estado: dict, state_file: str | None = None,
+    nsu: int | None = None, callback=None,
 ) -> dict:
     cnpj = empresa.emitente.cnpj
     ambiente = "homologacao" if empresa.homologacao else "producao"
 
     bloqueado, msg = verificar_cooldown(get_cooldown(estado, cnpj, ambiente))
     if bloqueado:
-        return {"sucesso": False, "motivo": msg, "documentos": []}
+        return {"sucesso": False, "motivo": msg, "documentos": [], "estado": estado, "xmls_resposta": []}
 
     if nsu is None:
         nsu = get_ultimo_nsu(estado, cnpj)
@@ -244,14 +192,12 @@ def consultar_nsu(
     )
 
     documentos = []
+    xmls_resposta = []
     ult_nsu = nsu
     max_nsu = nsu
     c_stat = None
     x_motivo = None
     pagina = 0
-
-    os.makedirs(f"downloads/{cnpj}", exist_ok=True)
-    respostas = []
 
     while True:
         pagina += 1
@@ -269,30 +215,28 @@ def consultar_nsu(
         ult_nsu = int(ult_nsu_el[0].text) if ult_nsu_el else ult_nsu
         max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
 
-        # salvar resposta bruta do servidor
-        arquivo_resp = salvar_resposta_sefaz(xml_resp, "dist-dfe", f"{cnpj}-p{pagina:03d}")
-        respostas.append(arquivo_resp)
+        xmls_resposta.append(_xml_str(xml_resp))
 
-        # qualquer status != 138 interrompe o loop
         if c_stat != "138":
             break
 
-        _processar_docs(xml_resp, documentos, cnpj)
+        docs = _processar_docs(xml_resp)
+        documentos.extend(docs)
 
         set_ultimo_nsu(estado, cnpj, ult_nsu)
-        salvar_estado(state_file, estado)
+        if state_file:
+            salvar_estado(state_file, estado)
 
         if callback:
             callback(pagina, len(documentos), ult_nsu, max_nsu)
 
-        # se ultNSU == maxNSU, nao ha mais documentos
         if ult_nsu >= max_nsu:
             break
 
-    # cooldown so ativa em erros reais (656, etc.) — nao em 137 (fim normal) nem 138 (sucesso)
     if c_stat not in ("137", "138"):
         set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
-        salvar_estado(state_file, estado)
+        if state_file:
+            salvar_estado(state_file, estado)
 
     return {
         "sucesso": c_stat in ("137", "138"),
@@ -301,5 +245,6 @@ def consultar_nsu(
         "ultimo_nsu": ult_nsu,
         "max_nsu": max_nsu,
         "documentos": documentos,
-        "respostas": respostas,
+        "xmls_resposta": xmls_resposta,
+        "estado": estado,
     }

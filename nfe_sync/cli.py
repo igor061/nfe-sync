@@ -1,4 +1,5 @@
 import argparse
+import os
 import subprocess
 import sys
 import urllib3
@@ -17,6 +18,7 @@ from .state import (
     set_ultimo_nsu,
 )
 from .exceptions import NfeConfigError, NfeValidationError
+from .log import salvar_resposta_sefaz
 
 CONFIG_FILE = "nfe-sync.conf.ini"
 STATE_FILE = ".state.json"
@@ -25,6 +27,55 @@ GITHUB_CHANGELOG = "https://raw.githubusercontent.com/igor061/nfe-sync/main/CHAN
 GITHUB_README = "https://raw.githubusercontent.com/igor061/nfe-sync/main/README.md"
 GITHUB_PKG = "git+https://github.com/igor061/nfe-sync.git"
 
+
+# ---------------------------------------------------------------------------
+# Helpers de I/O (usados pelos cmd_* para persistir o que a lib retorna)
+# ---------------------------------------------------------------------------
+
+def _salvar_xml(cnpj: str, nome: str, xml: str) -> str:
+    """Cria downloads/{cnpj}/ e salva XML. Retorna o caminho do arquivo."""
+    pasta = f"downloads/{cnpj}"
+    os.makedirs(pasta, exist_ok=True)
+    caminho = f"{pasta}/{nome}"
+    with open(caminho, "w") as f:
+        f.write(xml)
+    return caminho
+
+
+def _salvar_log_xml(xml_str: str, tipo: str, ref: str) -> str:
+    """Salva resposta SEFAZ em log/. Wrapper sobre log.salvar_resposta_sefaz()."""
+    from pynfe.utils import etree
+    xml_el = etree.fromstring(xml_str.encode())
+    return salvar_resposta_sefaz(xml_el, tipo, ref)
+
+
+def _listar_resumos_pendentes(cnpj: str) -> list[str]:
+    """Escaneia downloads/{cnpj}/ por arquivos resNFe (root tag = resNFe)."""
+    from pynfe.utils import etree
+    pasta = f"downloads/{cnpj}"
+    if not os.path.isdir(pasta):
+        return []
+    resumos = []
+    for nome in os.listdir(pasta):
+        if not nome.endswith(".xml"):
+            continue
+        # chave tem 44 digitos; resNFe salvo como {chave}.xml = 48 chars
+        if len(nome) != 48:
+            continue
+        try:
+            tree = etree.parse(os.path.join(pasta, nome))
+            root = tree.getroot()
+            local = root.tag.split("}")[-1] if "}" in root.tag else root.tag
+            if local == "resNFe":
+                resumos.append(nome[:-4])
+        except Exception:
+            pass
+    return resumos
+
+
+# ---------------------------------------------------------------------------
+# Versao / atualizacao
+# ---------------------------------------------------------------------------
 
 def _versao_local() -> str:
     try:
@@ -67,7 +118,7 @@ def _changelog_novidades(versao_local: str) -> list[str]:
                     capturando = True
                     linhas.append(linha)
                 else:
-                    break  # chegou na versao local ou anterior, para
+                    break
             elif capturando:
                 linhas.append(linha)
         return linhas
@@ -118,6 +169,10 @@ def cmd_atualizar(args):
     subprocess.run([sys.executable, "-m", "pip", "install", "--upgrade", GITHUB_PKG], check=True)
 
 
+# ---------------------------------------------------------------------------
+# Helpers de contexto
+# ---------------------------------------------------------------------------
+
 def _carregar(args):
     empresas = carregar_empresas(CONFIG_FILE)
     nome = args.empresa
@@ -133,6 +188,10 @@ def _carregar(args):
     estado = carregar_estado(STATE_FILE)
     return empresa, estado
 
+
+# ---------------------------------------------------------------------------
+# Comandos SEFAZ
+# ---------------------------------------------------------------------------
 
 def cmd_emitir(args):
     empresa, estado = _carregar(args)
@@ -191,16 +250,24 @@ def cmd_emitir(args):
     resultado = emitir(empresa, serie, numero_nf, dados)
 
     if resultado.get("sucesso"):
+        _salvar_log_xml(resultado["xml"], "emissao", cnpj)
+        os.makedirs("xml", exist_ok=True)
+        arquivo = f"xml/{resultado['chave']}.xml"
+        with open(arquivo, "w") as f:
+            f.write(resultado["xml"])
+
         print(f"Status: {resultado['status']}")
         print(f"Motivo: {resultado['motivo']}")
         print(f"Protocolo: {resultado['protocolo']}")
         print(f"Chave: {resultado['chave']}")
-        print(f"XML salvo em: {resultado['arquivo']}")
+        print(f"XML salvo em: {arquivo}")
 
         set_ultimo_numero_nf(estado, cnpj, serie, numero_nf)
         salvar_estado(STATE_FILE, estado)
         print(f"Numero NF {numero_nf} serie {serie} salvo em {STATE_FILE}")
     else:
+        if resultado.get("xml_resposta"):
+            _salvar_log_xml(resultado["xml_resposta"], "emissao-erro", cnpj)
         print("ERRO na emissao:")
         for erro in resultado.get("erros", []):
             print(f"  cStat={erro['status']}  {erro['motivo']}")
@@ -220,34 +287,68 @@ def cmd_consultar(args):
     from .consulta import consultar, consultar_dfe_chave
     resultado = consultar(empresa, args.chave)
 
+    _salvar_log_xml(resultado["xml_resposta"], "consulta", args.chave)
+
     for sit in resultado["situacao"]:
         print(f"  cStat={sit['status']}  {sit['motivo']}")
 
-    if resultado["arquivo"]:
-        print(f"  Protocolo salvo em: {resultado['arquivo']}")
+    if resultado["xml"]:
+        arquivo = _salvar_xml(cnpj, f"{args.chave}-situacao.xml", resultado["xml"])
+        print(f"  Protocolo salvo em: {arquivo}")
 
     # tenta baixar o XML completo via DFe
     print()
     print("Tentando baixar XML completo via distribuicao DFe...")
     dfe = consultar_dfe_chave(empresa, args.chave)
+    _salvar_log_xml(dfe["xml_resposta"], "dist-dfe-chave", args.chave)
     print(f"  cStat={dfe.get('status')}  {dfe.get('motivo')}")
-    if dfe.get("arquivo_cancelamento"):
-        print(f"  Registro de cancelamento salvo em: {dfe['arquivo_cancelamento']}")
-    if dfe.get("arquivo_cancelada"):
-        print(f"  NF-e renomeada para: {dfe['arquivo_cancelada']}")
+
+    if dfe.get("xml_cancelamento"):
+        arq_cancel = _salvar_xml(cnpj, f"{args.chave}-cancelamento.xml", dfe["xml_cancelamento"])
+        print(f"  Registro de cancelamento salvo em: {arq_cancel}")
+        arq_cancelada = _tratar_arquivo_cancelado(cnpj, args.chave)
+        if arq_cancelada:
+            print(f"  NF-e renomeada para: {arq_cancelada}")
+
     for doc in dfe.get("documentos", []):
         if "erro" in doc:
             print(f"  ERRO: {doc['erro']}")
         else:
             chave_doc = doc.get("chave") or doc["nsu"]
             schema = doc["schema"]
-            if "procNFe" in schema and doc.get("substituiu_resumo"):
+            arquivo_existente = f"downloads/{cnpj}/{doc['nome']}"
+            substituiu_resumo = os.path.exists(arquivo_existente) and "procNFe" in schema
+            _salvar_xml(cnpj, doc["nome"], doc["xml"])
+            if "procNFe" in schema and substituiu_resumo:
                 tipo = "XML completo (substituiu resumo)"
             elif "procNFe" in schema:
                 tipo = "XML completo"
             else:
                 tipo = "resumo"
-            print(f"  ({tipo}) — {doc['arquivo']}")
+            print(f"  ({tipo}) — {arquivo_existente}")
+
+
+def _tratar_arquivo_cancelado(cnpj: str, chave: str) -> str | None:
+    """Trata arquivo existente quando NF-e foi cancelada (status 653).
+
+    Se o arquivo existente for resNFe, apaga. Se for procNFe ou outro,
+    renomeia para -cancelada.xml. Retorna o novo caminho ou None.
+    """
+    from pynfe.utils import etree
+    existente = f"downloads/{cnpj}/{chave}.xml"
+    if not os.path.exists(existente):
+        return None
+    try:
+        root_tag = etree.parse(existente).getroot().tag.split("}")[-1]
+    except Exception:
+        root_tag = ""
+    if root_tag == "resNFe":
+        os.remove(existente)
+        return None
+    else:
+        destino = f"downloads/{cnpj}/{chave}-cancelada.xml"
+        os.rename(existente, destino)
+        return destino
 
 
 def cmd_consultar_nsu(args):
@@ -269,17 +370,22 @@ def cmd_consultar_nsu(args):
     def progresso(pagina, total_docs, ult_nsu, max_nsu):
         print(f"  Pagina {pagina}: {total_docs} docs ate agora (NSU {ult_nsu}/{max_nsu})")
 
-    from .consulta import consultar_nsu, consultar_dfe_chave, listar_resumos_pendentes
+    from .consulta import consultar_nsu, consultar_dfe_chave
 
     if args.chave:
         resultado = consultar_dfe_chave(empresa, args.chave)
+        arq_resp = _salvar_log_xml(resultado["xml_resposta"], "dist-dfe-chave", args.chave)
         print(f"Status: {resultado.get('status')}")
         print(f"Motivo: {resultado.get('motivo')}")
-        print(f"Resposta salva em: {resultado['resposta']}")
-        if resultado.get("arquivo_cancelamento"):
-            print(f"Registro de cancelamento salvo em: {resultado['arquivo_cancelamento']}")
-        if resultado.get("arquivo_cancelada"):
-            print(f"NF-e renomeada para: {resultado['arquivo_cancelada']}")
+        print(f"Resposta salva em: {arq_resp}")
+
+        if resultado.get("xml_cancelamento"):
+            arq_cancel = _salvar_xml(cnpj, f"{args.chave}-cancelamento.xml", resultado["xml_cancelamento"])
+            print(f"Registro de cancelamento salvo em: {arq_cancel}")
+            arq_cancelada = _tratar_arquivo_cancelado(cnpj, args.chave)
+            if arq_cancelada:
+                print(f"NF-e renomeada para: {arq_cancelada}")
+
         docs = resultado.get("documentos", [])
         if docs:
             print(f"Documentos: {len(docs)}")
@@ -288,9 +394,12 @@ def cmd_consultar_nsu(args):
                     print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
                 else:
                     chave_doc = doc.get("chave") or doc["nsu"]
-                    schema = doc['schema']
-                    tipo = "XML completo (substituiu resumo)" if "procNFe" in schema and doc.get("substituiu_resumo") else ("XML completo" if "procNFe" in schema else "resumo")
-                    print(f"  ({tipo}) chave={chave_doc} — {doc['arquivo']}")
+                    schema = doc["schema"]
+                    arquivo_existente = f"downloads/{cnpj}/{doc['nome']}"
+                    substituiu_resumo = os.path.exists(arquivo_existente) and "procNFe" in schema
+                    _salvar_xml(cnpj, doc["nome"], doc["xml"])
+                    tipo = "XML completo (substituiu resumo)" if "procNFe" in schema and substituiu_resumo else ("XML completo" if "procNFe" in schema else "resumo")
+                    print(f"  ({tipo}) chave={chave_doc} — {arquivo_existente}")
         return
 
     resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu, callback=progresso)
@@ -304,7 +413,8 @@ def cmd_consultar_nsu(args):
     print(f"Ultimo NSU: {resultado.get('ultimo_nsu')}")
     print(f"Max NSU: {resultado.get('max_nsu')}")
 
-    for arq in resultado.get("respostas", []):
+    for i, xml_resp in enumerate(resultado.get("xmls_resposta", []), start=1):
+        arq = _salvar_log_xml(xml_resp, "dist-dfe", f"{cnpj}-p{i:03d}")
         print(f"Resposta salva em: {arq}")
 
     docs = resultado.get("documentos", [])
@@ -315,17 +425,20 @@ def cmd_consultar_nsu(args):
                 print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
             else:
                 chave = doc.get("chave") or doc["nsu"]
-                schema = doc['schema']
-                if "procNFe" in schema and doc.get("substituiu_resumo"):
+                schema = doc["schema"]
+                arquivo_existente = f"downloads/{cnpj}/{doc['nome']}"
+                substituiu_resumo = os.path.exists(arquivo_existente) and "procNFe" in schema
+                _salvar_xml(cnpj, doc["nome"], doc["xml"])
+                if "procNFe" in schema and substituiu_resumo:
                     tipo = "XML completo (substituiu resumo)"
                 elif "procNFe" in schema:
                     tipo = "XML completo"
                 else:
                     tipo = "resumo"
-                print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {doc['arquivo']}")
+                print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {arquivo_existente}")
 
     # verifica resNFe pendentes no disco (run atual + runs anteriores)
-    pendentes = listar_resumos_pendentes(cnpj)
+    pendentes = _listar_resumos_pendentes(cnpj)
     if pendentes:
         print()
         print(f"NF-e com resumo pendente — {len(pendentes)} chave(s) aguardando XML completo:")
@@ -343,13 +456,14 @@ def cmd_consultar_nsu(args):
             for chave in pendentes:
                 try:
                     res = manifestar(empresa, "ciencia", chave, "")
+                    _salvar_log_xml(res["xml_resposta"], "manifestacao", f"{cnpj}-ciencia")
+                    _salvar_xml(cnpj, f"{chave}-evento-ciencia.xml", res["xml"])
                     for r in res["resultados"]:
                         print(f"  {chave[:8]}...  cStat={r['status']}  {r['motivo']}")
                 except Exception as e:
                     print(f"  {chave[:8]}...  ERRO: {e}")
             print()
             print("Consultando novamente para baixar XML completo...")
-            from .state import carregar_estado
             estado2 = carregar_estado(STATE_FILE)
             resultado2 = consultar_nsu(empresa, estado2, STATE_FILE, callback=progresso)
             print(f"Status: {resultado2.get('status')}")
@@ -363,27 +477,28 @@ def cmd_consultar_nsu(args):
                         print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
                     else:
                         chave = doc.get("chave") or doc["nsu"]
-                        schema = doc['schema']
-                        if "procNFe" in schema and doc.get("substituiu_resumo"):
+                        schema = doc["schema"]
+                        arquivo_existente = f"downloads/{cnpj}/{doc['nome']}"
+                        substituiu_resumo = os.path.exists(arquivo_existente) and "procNFe" in schema
+                        _salvar_xml(cnpj, doc["nome"], doc["xml"])
+                        if "procNFe" in schema and substituiu_resumo:
                             tipo = "XML completo (substituiu resumo)"
                             completos.append(chave)
                         elif "procNFe" in schema:
                             tipo = "XML completo"
                         else:
                             tipo = "resumo"
-                        print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {doc['arquivo']}")
+                        print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {arquivo_existente}")
             if completos:
                 print()
                 print(f"XML completo baixado para {len(completos)} NF-e(s).")
-            ainda_pendentes = listar_resumos_pendentes(cnpj)
+            ainda_pendentes = _listar_resumos_pendentes(cnpj)
             if ainda_pendentes:
                 print()
                 print(f"Ainda ha {len(ainda_pendentes)} resumo(s) pendente(s). Execute novamente para tentar novamente.")
 
 
 def cmd_pendentes(args):
-    from .consulta import listar_resumos_pendentes
-
     if args.empresa:
         empresa, _ = _carregar(args)
         empresas_cnpj = [(args.empresa, empresa.emitente.cnpj)]
@@ -393,7 +508,7 @@ def cmd_pendentes(args):
 
     total = 0
     for nome, cnpj in empresas_cnpj:
-        pendentes = listar_resumos_pendentes(cnpj)
+        pendentes = _listar_resumos_pendentes(cnpj)
         if not pendentes:
             print(f"{nome} ({cnpj}): nenhum resumo pendente.")
             continue
@@ -409,8 +524,9 @@ def cmd_pendentes(args):
 
 def cmd_manifestar(args):
     empresa, estado = _carregar(args)
+    cnpj = empresa.emitente.cnpj
 
-    print(f"Empresa: {empresa.nome} (CNPJ {empresa.emitente.cnpj})")
+    print(f"Empresa: {empresa.nome} (CNPJ {cnpj})")
     print(f"Ambiente: {'Homologacao' if empresa.homologacao else 'Producao'}")
     print(f"Operacao: {args.operacao}")
     print(f"Chave: {args.chave}")
@@ -421,18 +537,22 @@ def cmd_manifestar(args):
     from .manifestacao import manifestar
     resultado = manifestar(empresa, args.operacao, args.chave, args.justificativa)
 
+    _salvar_log_xml(resultado["xml_resposta"], "manifestacao", f"{cnpj}-{args.operacao}")
+    arquivo = _salvar_xml(cnpj, f"{args.chave}-evento-{args.operacao}.xml", resultado["xml"])
+
     print("=== RESULTADO ===")
     for r in resultado["resultados"]:
         print(f"  cStat={r['status']}  {r['motivo']}")
     if resultado["protocolo"]:
         print(f"  Protocolo: {resultado['protocolo']}")
-    print(f"  Resposta salva em: {resultado['arquivo']}")
+    print(f"  Resposta salva em: {arquivo}")
 
 
 def cmd_inutilizar(args):
     empresa, estado = _carregar(args)
+    cnpj = empresa.emitente.cnpj
 
-    print(f"Empresa: {empresa.nome} (CNPJ {empresa.emitente.cnpj})")
+    print(f"Empresa: {empresa.nome} (CNPJ {cnpj})")
     print(f"Ambiente: {'Homologacao' if empresa.homologacao else 'Producao'}")
     print(f"Serie: {args.serie}")
     print(f"Faixa: {args.inicio} a {args.fim}")
@@ -442,13 +562,23 @@ def cmd_inutilizar(args):
     from .inutilizacao import inutilizar
     resultado = inutilizar(empresa, args.serie, args.inicio, args.fim, args.justificativa)
 
+    _salvar_log_xml(resultado["xml_resposta"], "inutilizacao", f"{cnpj}-serie{args.serie}-{args.inicio}-{args.fim}")
+    os.makedirs("xml/inutilizacao", exist_ok=True)
+    arquivo = f"xml/inutilizacao/inut-serie{args.serie}-{args.inicio}-{args.fim}.xml"
+    with open(arquivo, "w") as f:
+        f.write(resultado["xml"])
+
     print("=== RESULTADO ===")
     for r in resultado["resultados"]:
         print(f"  cStat={r['status']}  {r['motivo']}")
     if resultado["protocolo"]:
         print(f"  Protocolo: {resultado['protocolo']}")
-    print(f"  Resposta salva em: {resultado['arquivo']}")
+    print(f"  Resposta salva em: {arquivo}")
 
+
+# ---------------------------------------------------------------------------
+# Parser
+# ---------------------------------------------------------------------------
 
 def cli(argv=None):
     parser = argparse.ArgumentParser(

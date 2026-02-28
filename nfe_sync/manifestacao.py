@@ -1,4 +1,3 @@
-import os
 from datetime import datetime
 
 from pynfe.entidades.fonte_dados import FonteDados
@@ -10,7 +9,6 @@ from pynfe.utils import etree
 
 from .models import EmpresaConfig
 from .exceptions import NfeValidationError
-from .log import salvar_resposta_sefaz
 
 
 OPERACOES = {
@@ -75,22 +73,16 @@ def manifestar(
 
     ns = {"ns": "http://www.portalfiscal.inf.br/nfe"}
     xml_resp = etree.fromstring(resposta.content)
-    salvar_resposta_sefaz(xml_resp, "manifestacao", f"{cnpj}-{operacao}")
+    xml_resp_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
 
     stats = xml_resp.xpath("//ns:cStat", namespaces=ns)
     motivos = xml_resp.xpath("//ns:xMotivo", namespaces=ns)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=ns)
 
-    os.makedirs(f"downloads/{cnpj}", exist_ok=True)
-    arquivo = f"downloads/{cnpj}/{chave}-evento-{operacao}.xml"
-    xml_resp_str = etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
-    with open(arquivo, "w") as f:
-        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-        f.write(xml_resp_str)
-
     return {
         "operacao": operacao_desc,
         "resultados": [{"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)],
         "protocolo": protocolos[0].text if protocolos else None,
-        "arquivo": arquivo,
+        "xml": xml_resp_str,
+        "xml_resposta": xml_resp_str,
     }

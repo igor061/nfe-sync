@@ -21,6 +21,10 @@ from .state import (
     set_ultimo_nsu,
 )
 from .exceptions import NfeConfigError, NfeValidationError
+from .consulta import consultar, consultar_nsu, consultar_dfe_chave
+from .manifestacao import manifestar
+from .inutilizacao import inutilizar
+from .emissao import emitir
 
 __all__ = [
     "Certificado",
@@ -43,4 +47,10 @@ __all__ = [
     "set_ultimo_nsu",
     "NfeConfigError",
     "NfeValidationError",
+    "consultar",
+    "consultar_nsu",
+    "consultar_dfe_chave",
+    "manifestar",
+    "inutilizar",
+    "emitir",
 ]
