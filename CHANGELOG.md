@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.32
+- install-hooks: usar link simbolico em vez de copia\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.31
 - adicionar scripts/hooks/pre-commit e install-hooks.sh para versionamento automatico\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
