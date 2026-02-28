@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.18
+- corrigir hook: ler mensagem via ps para garantir versao unica por commit
+
 ## 0.2.17
 - bump versao para garantir atualizacao do fix de nao salvar XML em erros
 

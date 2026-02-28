@@ -140,3 +140,4 @@ api_cli cnpjws 33000167000101 --salvar-ini MINHAEMPRESA
 - Python 3.12+
 - Certificado digital A1 (.pfx)
 
+
