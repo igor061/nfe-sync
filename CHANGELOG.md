@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.14
+- alinhar conteudo do ini a esquerda para facilitar copia
+
 ## 0.2.13
 - melhorar ajuda de configuracao: mostrar conteudo do ini e caminho do arquivo
 
