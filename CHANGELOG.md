@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.11
+- adicionar subcomando readme para exibir documentacao
+
 ## 0.2.10
 - corrigir hook: usar post-commit com amend para mensagem correta no CHANGELOG
 

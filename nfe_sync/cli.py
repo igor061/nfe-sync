@@ -22,6 +22,7 @@ CONFIG_FILE = "nfe-sync.conf.ini"
 STATE_FILE = ".state.json"
 GITHUB_RAW = "https://raw.githubusercontent.com/igor061/nfe-sync/main/pyproject.toml"
 GITHUB_CHANGELOG = "https://raw.githubusercontent.com/igor061/nfe-sync/main/CHANGELOG.md"
+GITHUB_README = "https://raw.githubusercontent.com/igor061/nfe-sync/main/README.md"
 GITHUB_PKG = "git+https://github.com/igor061/nfe-sync.git"
 
 
@@ -91,6 +92,15 @@ def cmd_versao(args):
             for linha in novidades:
                 print(linha)
         print(f"\nPara atualizar: nfe-sync atualizar")
+
+
+def cmd_readme(args):
+    try:
+        import urllib.request
+        with urllib.request.urlopen(GITHUB_README, timeout=5) as r:
+            print(r.read().decode())
+    except Exception:
+        print("Nao foi possivel obter o README. Acesse: https://github.com/igor061/nfe-sync")
 
 
 def cmd_atualizar(args):
@@ -320,6 +330,7 @@ def cli(argv=None):
             "  nfe-sync inutilizar     EMPRESA --serie 1 --inicio 5 --fim 8 --justificativa 'Motivo'\n"
             "  nfe-sync versao\n"
             "  nfe-sync atualizar\n"
+            "  nfe-sync readme\n"
         ),
     )
     amb = parser.add_mutually_exclusive_group()
@@ -410,6 +421,14 @@ def cli(argv=None):
         description="Atualiza o nfe-sync para a versao mais recente disponivel no repositorio.",
     )
     p_atualizar.set_defaults(func=cmd_atualizar)
+
+    # readme
+    p_readme = sub.add_parser(
+        "readme",
+        help="Exibir o README com a documentacao completa",
+        description="Exibe o README do repositorio com instrucoes de instalacao, configuracao e uso.",
+    )
+    p_readme.set_defaults(func=cmd_readme)
 
     args = parser.parse_args(argv)
 
