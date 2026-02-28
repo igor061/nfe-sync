@@ -40,6 +40,12 @@ Use os scripts na raiz do projeto, que ativam a virtualenv automaticamente:
 ./run_api_cli --help
 ```
 
+Instale os git hooks para incremento automático de versão e CHANGELOG:
+
+```bash
+./scripts/install-hooks.sh
+```
+
 ## Configuração
 
 Copie o arquivo de exemplo e preencha com os dados da sua empresa:
