@@ -193,8 +193,8 @@ def consultar_nsu(
         if ult_nsu >= max_nsu:
             break
 
-    # cooldown so ativa quando nao ha mais documentos (137) ou erro (656 etc)
-    if not documentos or c_stat != "138":
+    # cooldown so ativa em erros reais (656, etc.) — nao em 137 (fim normal) nem 138 (sucesso)
+    if c_stat not in ("137", "138"):
         set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
         salvar_estado(state_file, estado)
 

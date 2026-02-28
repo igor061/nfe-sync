@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.21
+- corrigir cooldown: ativar apenas em erros, nao em fim normal da fila (137)
+
 ## 0.2.20
 - explicar fluxo para download do XML completo apos consultar e consultar-nsu
 
