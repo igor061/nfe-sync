@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.13
+- melhorar ajuda de configuracao: mostrar conteudo do ini e caminho do arquivo
+
 ## 0.2.12
 - mostrar ajuda de configuracao quando nfe-sync.conf.ini nao for encontrado
 
