@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.24
+- consultar: usar UF da chave para conectar ao servidor correto da SEFAZ\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.23
 - adicionar subcomando pendentes para listar resNFe aguardando XML completo\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 

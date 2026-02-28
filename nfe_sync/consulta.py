@@ -13,6 +13,19 @@ from .log import salvar_resposta_sefaz
 COOLDOWN_MINUTOS = 61
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
 
+COD_UF = {
+    "11": "ro", "12": "ac", "13": "am", "14": "rr", "15": "pa",
+    "16": "ap", "17": "to", "21": "ma", "22": "pi", "23": "ce",
+    "24": "rn", "25": "pb", "26": "pe", "27": "al", "28": "se",
+    "29": "ba", "31": "mg", "32": "es", "33": "rj", "35": "sp",
+    "41": "pr", "42": "sc", "43": "rs", "50": "ms", "51": "mt",
+    "52": "go", "53": "df",
+}
+
+
+def _uf_da_chave(chave: str) -> str | None:
+    return COD_UF.get(chave[:2])
+
 
 def verificar_cooldown(bloqueado_ate: str | None) -> tuple[bool, str]:
     if not bloqueado_ate:
@@ -34,8 +47,9 @@ def calcular_proximo_cooldown(minutos: int = COOLDOWN_MINUTOS) -> str:
 
 
 def consultar(empresa: EmpresaConfig, chave: str) -> dict:
+    uf = _uf_da_chave(chave) or empresa.uf
     con = ComunicacaoSefaz(
-        empresa.uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
+        uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
     )
 
     resp_sit = con.consulta_nota(modelo="nfe", chave=chave)
