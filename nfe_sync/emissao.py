@@ -7,10 +7,13 @@ from pynfe.entidades.cliente import Cliente
 from pynfe.entidades.notafiscal import NotaFiscal
 from pynfe.processamento.serializacao import SerializacaoXML
 from pynfe.processamento.assinatura import AssinaturaA1
-from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 
 from .models import EmpresaConfig, DadosEmissao, validar_cnpj_sefaz
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao
+
+
+NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
 
 
 def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmissao) -> dict:
@@ -122,23 +125,17 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
     assinatura = AssinaturaA1(empresa.certificado.path, empresa.certificado.senha)
     xml_assinado = assinatura.assinar(xml)
 
-    con = ComunicacaoSefaz(
-        empresa.uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
-    )
+    con = criar_comunicacao(empresa)
     resposta = con.autorizacao(modelo="nfe", nota_fiscal=xml_assinado)
-
-    ns = {"ns": "http://www.portalfiscal.inf.br/nfe"}
 
     if isinstance(resposta, tuple):
         codigo = resposta[0]
         if codigo == 0:
             nfe_proc = resposta[1]
-            status = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:cStat", namespaces=ns)
-            motivo = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:xMotivo", namespaces=ns)
-            protocolo = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:nProt", namespaces=ns)
-            chave = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:chNFe", namespaces=ns)
-
-            xml_final = '<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(nfe_proc, encoding="unicode", pretty_print=True)
+            status = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:cStat", namespaces=NS)
+            motivo = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:xMotivo", namespaces=NS)
+            protocolo = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:nProt", namespaces=NS)
+            chave = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:chNFe", namespaces=NS)
             chave_txt = chave[0].text if chave else "nfe"
 
             return {
@@ -147,7 +144,7 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
                 "motivo": motivo[0].text if motivo else None,
                 "protocolo": protocolo[0].text if protocolo else None,
                 "chave": chave_txt,
-                "xml": xml_final,
+                "xml": to_xml_string(nfe_proc),
             }
         else:
             http_resp = resposta[1]
@@ -156,12 +153,8 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
                 body = etree.fromstring(
                     http_resp.content if hasattr(http_resp, "content") else http_resp
                 )
-                stats = body.xpath("//ns:cStat", namespaces=ns)
-                motivos = body.xpath("//ns:xMotivo", namespaces=ns)
-                erros = [
-                    {"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)
-                ]
-                xml_resposta = '<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(body, encoding="unicode", pretty_print=True)
+                erros = extract_status_motivo(body, NS)
+                xml_resposta = to_xml_string(body)
             except Exception:
                 erros = [{"status": str(codigo), "motivo": "Erro ao parsear resposta"}]
             return {"sucesso": False, "codigo": codigo, "erros": erros, "xml_resposta": xml_resposta}

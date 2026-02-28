@@ -4,12 +4,14 @@ from pynfe.entidades.fonte_dados import FonteDados
 from pynfe.entidades.evento import EventoManifestacaoDest
 from pynfe.processamento.serializacao import SerializacaoXML
 from pynfe.processamento.assinatura import AssinaturaA1
-from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao
 
+
+NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
 
 OPERACOES = {
     "ciencia": (2, "Ciencia da Operacao"),
@@ -67,22 +69,17 @@ def manifestar(
     assinatura = AssinaturaA1(empresa.certificado.path, empresa.certificado.senha)
     xml_assinado = assinatura.assinar(xml_evento)
 
-    con = ComunicacaoSefaz(
-        empresa.uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
-    )
+    con = criar_comunicacao(empresa)
     resposta = con.evento(modelo="nfe", evento=xml_assinado)
 
-    ns = {"ns": "http://www.portalfiscal.inf.br/nfe"}
     xml_resp = etree.fromstring(resposta.content)
-    xml_resp_str = '<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
-
-    stats = xml_resp.xpath("//ns:cStat", namespaces=ns)
-    motivos = xml_resp.xpath("//ns:xMotivo", namespaces=ns)
-    protocolos = xml_resp.xpath("//ns:nProt", namespaces=ns)
+    xml_resp_str = to_xml_string(xml_resp)
+    resultados = extract_status_motivo(xml_resp, NS)
+    protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)
 
     return {
         "operacao": operacao_desc,
-        "resultados": [{"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)],
+        "resultados": resultados,
         "protocolo": protocolos[0].text if protocolos else None,
         "xml": xml_resp_str,
         "xml_resposta": xml_resp_str,
