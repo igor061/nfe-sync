@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.41
+- fix: adicionar arquivos commands/__init__, consulta e sistema ao git (esquecidos no commit anterior)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.40
 - fix: incluir nfe_sync.commands no build (subpacote nao estava sendo empacotado)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
