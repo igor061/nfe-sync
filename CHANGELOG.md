@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.19
+- confirmar estabilidade do hook de versao
+
 ## 0.2.18
 - corrigir hook: ler mensagem via ps para garantir versao unica por commit
 
