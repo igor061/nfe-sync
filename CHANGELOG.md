@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.40
+- fix: incluir nfe_sync.commands no build (subpacote nao estava sendo empacotado)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.39
 - docs: adiciona secao API Python com exemplos de consultar, consultar_dfe_chave e consultar_nsu\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
