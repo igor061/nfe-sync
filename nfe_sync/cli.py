@@ -217,7 +217,7 @@ def cmd_consultar(args):
     print(f"Chave: {args.chave}")
     print()
 
-    from .consulta import consultar
+    from .consulta import consultar, consultar_dfe_chave
     resultado = consultar(empresa, args.chave)
 
     for sit in resultado["situacao"]:
@@ -225,14 +225,29 @@ def cmd_consultar(args):
 
     if resultado["arquivo"]:
         print(f"  Protocolo salvo em: {resultado['arquivo']}")
-    else:
-        primeiro_stat = resultado["situacao"][0]["status"] if resultado["situacao"] else ""
-        if primeiro_stat.startswith("1"):
-            print()
-            print("  Nota: este comando retorna apenas o protocolo de autorizacao.")
-            print("  Para baixar o XML completo da NF-e use o fluxo:")
-            print(f"    1. nfe-sync manifestar {args.empresa} ciencia {args.chave}")
-            print(f"    2. nfe-sync consultar-nsu {args.empresa}")
+
+    # tenta baixar o XML completo via DFe
+    print()
+    print("Tentando baixar XML completo via distribuicao DFe...")
+    dfe = consultar_dfe_chave(empresa, args.chave)
+    print(f"  cStat={dfe.get('status')}  {dfe.get('motivo')}")
+    if dfe.get("arquivo_cancelamento"):
+        print(f"  Registro de cancelamento salvo em: {dfe['arquivo_cancelamento']}")
+    if dfe.get("arquivo_cancelada"):
+        print(f"  NF-e renomeada para: {dfe['arquivo_cancelada']}")
+    for doc in dfe.get("documentos", []):
+        if "erro" in doc:
+            print(f"  ERRO: {doc['erro']}")
+        else:
+            chave_doc = doc.get("chave") or doc["nsu"]
+            schema = doc["schema"]
+            if "procNFe" in schema and doc.get("substituiu_resumo"):
+                tipo = "XML completo (substituiu resumo)"
+            elif "procNFe" in schema:
+                tipo = "XML completo"
+            else:
+                tipo = "resumo"
+            print(f"  ({tipo}) — {doc['arquivo']}")
 
 
 def cmd_consultar_nsu(args):

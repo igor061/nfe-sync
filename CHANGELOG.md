@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.34
+- consultar: tentar baixar XML completo via DFe apos consulta de situacao\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.33
 - consultar-nsu --chave: usar UF do emitente (da chave) como cUFAutor\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
