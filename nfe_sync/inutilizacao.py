@@ -1,7 +1,7 @@
 from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 
-from .models import EmpresaConfig
+from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
 
 
@@ -24,6 +24,7 @@ def inutilizar(
             f"menor ou igual a numero_final ({num_fim})."
         )
 
+    validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj
 
     con = ComunicacaoSefaz(

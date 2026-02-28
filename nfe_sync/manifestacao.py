@@ -7,7 +7,7 @@ from pynfe.processamento.assinatura import AssinaturaA1
 from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 
-from .models import EmpresaConfig
+from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
 
 
@@ -42,6 +42,7 @@ def manifestar(
             f"com minimo 15 caracteres (recebeu {len(justificativa)})."
         )
 
+    validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     operacao_num, operacao_desc = OPERACOES[operacao]
     cnpj = empresa.emitente.cnpj
 

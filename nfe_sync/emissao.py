@@ -10,10 +10,11 @@ from pynfe.processamento.assinatura import AssinaturaA1
 from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 
-from .models import EmpresaConfig, DadosEmissao
+from .models import EmpresaConfig, DadosEmissao, validar_cnpj_sefaz
 
 
 def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmissao) -> dict:
+    validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     fonte = FonteDados()
     emi = empresa.emitente
     end = emi.endereco

@@ -3,6 +3,18 @@ import re
 
 from pydantic import BaseModel, field_validator
 
+from .exceptions import NfeValidationError
+
+
+def validar_cnpj_sefaz(cnpj: str, contexto: str = "") -> None:
+    """Lança NfeValidationError se o CNPJ não tiver exatamente 14 dígitos numéricos."""
+    prefixo = f"[{contexto}] " if contexto else ""
+    if len(cnpj) != 14 or not cnpj.isdigit():
+        raise NfeValidationError(
+            f"{prefixo}CNPJ invalido para chamada SEFAZ: '{cnpj}' "
+            f"(deve ter 14 digitos numericos, tem {len(cnpj)})"
+        )
+
 
 class Certificado(BaseModel):
     path: str

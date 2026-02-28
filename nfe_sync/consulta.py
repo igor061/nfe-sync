@@ -4,7 +4,7 @@ from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 from pynfe.utils.descompactar import DescompactaGzip
 
-from .models import EmpresaConfig
+from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
 
 
@@ -49,6 +49,7 @@ def _xml_str(xml_el) -> str:
 
 
 def consultar(empresa: EmpresaConfig, chave: str) -> dict:
+    validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     uf = _uf_da_chave(chave) or empresa.uf
     con = ComunicacaoSefaz(
         uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
@@ -140,6 +141,7 @@ def _processar_docs(xml_resp) -> list[dict]:
 
 def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     """Baixa o documento DFe (procNFe) diretamente pela chave de acesso."""
+    validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj
     uf = _uf_da_chave(chave) or empresa.uf
     con = ComunicacaoSefaz(
@@ -177,6 +179,7 @@ def consultar_nsu(
     empresa: EmpresaConfig, estado: dict, state_file: str | None = None,
     nsu: int | None = None, callback=None,
 ) -> dict:
+    validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj
     ambiente = "homologacao" if empresa.homologacao else "producao"
 

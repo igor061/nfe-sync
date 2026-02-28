@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.37
+- feat: valida CNPJ no inicio de cada chamada SEFAZ\012\012Adiciona validar_cnpj_sefaz() chamada em consultar, consultar_nsu,\012consultar_dfe_chave, manifestar, inutilizar e emitir antes de qualquer\012requisicao de rede. Lanca NfeValidationError com mensagem clara se o\012CNPJ nao tiver exatamente 14 digitos numericos.\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.36
 - fix: valida CNPJ ao carregar config (14 digitos, strip de formatacao)\012\012Previne cStat=215 do SEFAZ causado por CNPJ com numero errado de digitos\012no config. Aceita CNPJs formatados (10.755.237/0001-36) e converte para\012somente digitos. Erro claro na inicializacao em vez de rejeicao do SEFAZ.\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
