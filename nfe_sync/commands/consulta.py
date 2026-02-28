@@ -184,6 +184,7 @@ def cmd_consultar_nsu(args):
             from ..manifestacao import manifestar
             print()
             print("Registrando ciencia da operacao...")
+            canceladas = []
             for chave in pendentes:
                 try:
                     res = manifestar(empresa, "ciencia", chave, "")
@@ -191,8 +192,15 @@ def cmd_consultar_nsu(args):
                     _salvar_xml(cnpj, f"{chave}-evento-ciencia.xml", res["xml"])
                     for r in res["resultados"]:
                         print(f"  {chave[:8]}...  cStat={r['status']}  {r['motivo']}")
+                        if r["status"] == "650":
+                            canceladas.append(chave)
                 except Exception as e:
                     print(f"  {chave[:8]}...  ERRO: {e}")
+            for chave in canceladas:
+                resumo = f"downloads/{cnpj}/{chave}.xml"
+                if os.path.exists(resumo):
+                    os.remove(resumo)
+                    print(f"  {chave[:8]}...  resNFe removido (NF-e cancelada/denegada)")
             print()
             print("Consultando novamente para baixar XML completo...")
             estado2 = carregar_estado(STATE_FILE)

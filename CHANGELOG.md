@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.42
+- fix: remover resNFe do disco quando ciencia e rejeitada por NF-e cancelada (cStat=650)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.41
 - fix: adicionar arquivos commands/__init__, consulta e sistema ao git (esquecidos no commit anterior)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
