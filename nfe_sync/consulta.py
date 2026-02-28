@@ -171,8 +171,10 @@ def listar_resumos_pendentes(cnpj: str) -> list[str]:
 def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     """Baixa o documento DFe (procNFe) diretamente pela chave de acesso."""
     cnpj = empresa.emitente.cnpj
+    # cUFAutor para consChNFe deve ser a UF do emitente (primeiros 2 digitos da chave)
+    uf = _uf_da_chave(chave) or empresa.uf
     con = ComunicacaoSefaz(
-        empresa.uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
+        uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
     )
 
     os.makedirs(f"downloads/{cnpj}", exist_ok=True)
