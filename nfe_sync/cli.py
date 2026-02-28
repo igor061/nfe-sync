@@ -367,22 +367,29 @@ def cmd_consultar_nsu(args):
 
 
 def cmd_pendentes(args):
-    empresa, estado = _carregar(args)
-    cnpj = empresa.emitente.cnpj
-
     from .consulta import listar_resumos_pendentes
-    pendentes = listar_resumos_pendentes(cnpj)
 
-    if not pendentes:
-        print(f"Nenhum resumo pendente para {cnpj}.")
-        return
+    if args.empresa:
+        empresa, _ = _carregar(args)
+        empresas_cnpj = [(args.empresa, empresa.emitente.cnpj)]
+    else:
+        todas = carregar_empresas(CONFIG_FILE)
+        empresas_cnpj = [(nome, e.emitente.cnpj) for nome, e in todas.items()]
 
-    print(f"NF-e com resumo pendente — {len(pendentes)} chave(s) aguardando XML completo:")
-    for chave in pendentes:
-        print(f"  {chave}")
-    print()
-    print("Para baixar o XML completo:")
-    print(f"  nfe-sync consultar-nsu {args.empresa}")
+    total = 0
+    for nome, cnpj in empresas_cnpj:
+        pendentes = listar_resumos_pendentes(cnpj)
+        if not pendentes:
+            print(f"{nome} ({cnpj}): nenhum resumo pendente.")
+            continue
+        print(f"{nome} ({cnpj}): {len(pendentes)} chave(s) pendente(s):")
+        for chave in pendentes:
+            print(f"  {chave}")
+        print(f"  -> nfe-sync consultar-nsu {nome}")
+        total += len(pendentes)
+
+    if total == 0 and len(empresas_cnpj) > 1:
+        print("Nenhum resumo pendente em nenhuma empresa.")
 
 
 def cmd_manifestar(args):
@@ -503,9 +510,9 @@ def cli(argv=None):
         help=argparse.SUPPRESS,
         description="Lista as NF-e cujo resumo (resNFe) ja foi baixado mas o XML completo ainda nao foi obtido.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="Exemplo:\n  nfe-sync pendentes MINHAEMPRESA",
+        epilog="Exemplos:\n  nfe-sync pendentes\n  nfe-sync pendentes MINHAEMPRESA",
     )
-    p_pendentes.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
+    p_pendentes.add_argument("empresa", nargs="?", default=None, help="Nome da empresa (omitir para consultar todas)")
     p_pendentes.set_defaults(func=cmd_pendentes)
 
     # manifestar

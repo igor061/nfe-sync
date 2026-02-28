@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.29
+- pendentes: empresa opcional, sem argumento consulta todas as empresas\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.28
 - separar help em grupos: Comandos SEFAZ e Sistema\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
