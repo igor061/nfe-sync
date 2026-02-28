@@ -261,8 +261,10 @@ def cmd_consultar_nsu(args):
         print(f"Status: {resultado.get('status')}")
         print(f"Motivo: {resultado.get('motivo')}")
         print(f"Resposta salva em: {resultado['resposta']}")
+        if resultado.get("arquivo_cancelamento"):
+            print(f"Registro de cancelamento salvo em: {resultado['arquivo_cancelamento']}")
         if resultado.get("arquivo_cancelada"):
-            print(f"Registro de cancelamento salvo em: {resultado['arquivo_cancelada']}")
+            print(f"NF-e renomeada para: {resultado['arquivo_cancelada']}")
         docs = resultado.get("documentos", [])
         if docs:
             print(f"Documentos: {len(docs)}")

@@ -191,14 +191,26 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     if c_stat == "138":
         _processar_docs(xml_resp, documentos, cnpj)
     elif c_stat == "653":
-        arquivo_cancelada = f"downloads/{cnpj}/{chave}-cancelada.xml"
+        # salva registro de cancelamento
+        arquivo_cancelamento = f"downloads/{cnpj}/{chave}-cancelamento.xml"
         xml_str = etree.tostring(xml_resp, encoding="unicode", pretty_print=True)
-        with open(arquivo_cancelada, "w") as f:
+        with open(arquivo_cancelamento, "w") as f:
             f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
             f.write(xml_str)
-        resumo = f"downloads/{cnpj}/{chave}.xml"
-        if os.path.exists(resumo):
-            os.remove(resumo)
+        arquivo_cancelada = arquivo_cancelamento
+        # trata arquivo existente da NF-e
+        existente = f"downloads/{cnpj}/{chave}.xml"
+        if os.path.exists(existente):
+            try:
+                root_tag = etree.parse(existente).getroot().tag.split("}")[-1]
+            except Exception:
+                root_tag = ""
+            if root_tag == "resNFe":
+                os.remove(existente)
+            else:
+                # procNFe ou outro: renomeia para -cancelada.xml
+                os.rename(existente, f"downloads/{cnpj}/{chave}-cancelada.xml")
+                arquivo_cancelada = f"downloads/{cnpj}/{chave}-cancelada.xml"
 
     return {
         "sucesso": c_stat == "138",
@@ -206,7 +218,8 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
         "motivo": x_motivo,
         "documentos": documentos,
         "resposta": arquivo_resp,
-        "arquivo_cancelada": arquivo_cancelada,
+        "arquivo_cancelamento": arquivo_cancelamento if c_stat == "653" else None,
+        "arquivo_cancelada": f"downloads/{cnpj}/{chave}-cancelada.xml" if c_stat == "653" and os.path.exists(f"downloads/{cnpj}/{chave}-cancelada.xml") else None,
     }
 
 
