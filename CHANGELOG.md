@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.12
+- mostrar ajuda de configuracao quando nfe-sync.conf.ini nao for encontrado
+
 ## 0.2.11
 - adicionar subcomando readme para exibir documentacao
 

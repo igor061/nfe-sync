@@ -436,6 +436,16 @@ def cli(argv=None):
         args.func(args)
     except NfeConfigError as e:
         print(f"Erro de configuracao: {e}")
+        print()
+        print("Como configurar:")
+        print(f"  1. Copie o arquivo de exemplo:")
+        print(f"       cp nfe-sync.conf.ini.example nfe-sync.conf.ini")
+        print(f"  2. Ou use o api_cli para preencher automaticamente:")
+        print(f"       api_cli cnpjws <CNPJ> --salvar-ini MINHAEMPRESA")
+        print(f"  3. Edite o nfe-sync.conf.ini e preencha 'path' e 'senha' do certificado")
+        print()
+        print("Para ver a documentacao completa:")
+        print("  nfe-sync readme")
         sys.exit(1)
     except NfeValidationError as e:
         print(f"Erro de validacao: {e}")
