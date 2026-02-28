@@ -88,6 +88,16 @@ nfe-sync consultar-nsu MINHAEMPRESA --zerar-nsu
 
 > **`--zerar-nsu`:** permite baixar todas as NF-es dos últimos 90 dias disponíveis no SEFAZ, útil na primeira execução ou para reprocessar o histórico. O SEFAZ pode retornar erro 656 (uso indevido) na primeira tentativa, bloqueando as consultas por 1 a 4 horas. Após o bloqueio expirar, as consultas voltam a funcionar normalmente e todos os documentos disponíveis serão baixados.
 
+### Documentos na fila de distribuição DFe
+
+O `consultar-nsu` retorna todos os documentos da fila do SEFAZ para o CNPJ consultado, incluindo:
+
+- **resNFe** — resumo de NF-e recebida (emitida por terceiros para você). Requer manifestação de ciência para liberar o XML completo.
+- **procNFe** — XML completo da NF-e, disponível após registrar ciência.
+- **procEventoNFe** — evento vinculado a uma NF-e, como cancelamento, carta de correção ou **manifestação registrada pelo destinatário de uma NF-e emitida por você**.
+
+> **Nota:** se aparecer um evento de ciência para uma chave cujo CNPJ do emitente é o seu próprio CNPJ, isso significa que o seu cliente (destinatário) registrou ciência na nota que você emitiu. Não há resNFe nem procNFe para baixar nesse caso — você já possui o XML por ser o emitente.
+
 ### Manifestar destinatário
 
 ```bash
