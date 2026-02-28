@@ -151,6 +151,173 @@ api_cli cnpjws 33000167000101
 api_cli cnpjws 33000167000101 --salvar-ini MINHAEMPRESA
 ```
 
+## API Python
+
+O nfe-sync pode ser usado diretamente como biblioteca Python, sem passar pelo CLI. Isso é útil para integrações, automações e scripts personalizados.
+
+### Configurando a empresa
+
+```python
+from nfe_sync import carregar_empresas, carregar_estado
+
+empresas = carregar_empresas("nfe-sync.conf.ini")
+empresa = empresas["MINHAEMPRESA"]
+estado = carregar_estado(".state.json")   # {} se o arquivo não existir
+```
+
+Ou construindo o objeto manualmente:
+
+```python
+from nfe_sync import EmpresaConfig, Certificado, Emitente, Endereco
+
+empresa = EmpresaConfig(
+    nome="MINHAEMPRESA",
+    uf="sp",
+    homologacao=True,
+    certificado=Certificado(path="certs/cert.pfx", senha="senha"),
+    emitente=Emitente(
+        cnpj="00000000000191",
+        razao_social="Empresa Teste Ltda",
+        nome_fantasia="Empresa Teste",
+        inscricao_estadual="000000000",
+        cnae_fiscal="6201501",
+        regime_tributario="1",
+        endereco=Endereco(
+            logradouro="Rua Exemplo",
+            numero="100",
+            bairro="Centro",
+            municipio="São Paulo",
+            cod_municipio="3550308",
+            uf="SP",
+            cep="01310100",
+        ),
+    ),
+)
+```
+
+### `consultar` — situação de uma NF-e por chave
+
+Consulta o status de uma NF-e diretamente no webservice da SEFAZ da UF emitente.
+
+```python
+from nfe_sync import consultar
+
+resultado = consultar(empresa, "52260200597587000168550010000019137351883177")
+
+for sit in resultado["situacao"]:
+    print(sit["status"], sit["motivo"])
+# ex: 100  Autorizado o uso da NF-e
+
+if resultado["xml"]:
+    # XML da resposta de consulta (retConsSitNFe) disponível quando cStat = 1xx
+    print(resultado["xml"])
+```
+
+**Retorno:**
+
+| Chave | Tipo | Descrição |
+|---|---|---|
+| `situacao` | `list[dict]` | Lista com `status` (cStat) e `motivo` (xMotivo) |
+| `xml` | `str \| None` | XML da resposta quando autorizada (cStat 1xx) |
+| `xml_resposta` | `str` | XML bruto completo retornado pelo SEFAZ |
+
+### `consultar_dfe_chave` — baixar XML completo por chave via DFe
+
+Usa a API de distribuição DFe para baixar o procNFe (ou evento de cancelamento) de uma chave específica, sem avançar o NSU.
+
+```python
+from nfe_sync import consultar_dfe_chave
+
+dfe = consultar_dfe_chave(empresa, "52260200597587000168550010000019137351883177")
+
+print(dfe["status"], dfe["motivo"])
+# 138  Documento localizado  /  137  Nenhum documento localizado  /  653  NF-e cancelada
+
+for doc in dfe["documentos"]:
+    print(doc["schema"], doc["nome"])
+    # ex: procNFe_v4.00.xsd  52260200597587000168550010000019137351883177.xml
+    with open(doc["nome"], "w") as f:
+        f.write(doc["xml"])
+
+if dfe["xml_cancelamento"]:
+    # XML do evento de cancelamento quando cStat = 653
+    print(dfe["xml_cancelamento"])
+```
+
+**Retorno:**
+
+| Chave | Tipo | Descrição |
+|---|---|---|
+| `sucesso` | `bool` | `True` quando cStat = 138 (documento localizado) |
+| `status` | `str` | cStat da resposta SEFAZ |
+| `motivo` | `str` | xMotivo da resposta SEFAZ |
+| `documentos` | `list[dict]` | Documentos encontrados (ver abaixo) |
+| `xml_resposta` | `str` | XML bruto completo retornado pelo SEFAZ |
+| `xml_cancelamento` | `str \| None` | XML de cancelamento quando cStat = 653 |
+
+Cada item de `documentos`:
+
+| Chave | Tipo | Descrição |
+|---|---|---|
+| `nsu` | `str` | NSU do documento |
+| `chave` | `str \| None` | Chave de acesso (44 dígitos), quando disponível |
+| `schema` | `str` | Nome do schema XSD (ex: `procNFe_v4.00.xsd`) |
+| `nome` | `str` | Nome de arquivo sugerido (ex: `{chave}.xml`) |
+| `xml` | `str` | XML descompactado do documento |
+| `erro` | `str` | Presente somente em caso de erro de descompactação |
+
+### `consultar_nsu` — distribuição DFe por NSU (paginado)
+
+Baixa todos os documentos da fila de distribuição DFe do CNPJ a partir do último NSU salvo, paginando automaticamente até esgotar a fila.
+
+```python
+from nfe_sync import consultar_nsu, salvar_estado
+
+STATE_FILE = ".state.json"
+
+def progresso(pagina, total_docs, ult_nsu, max_nsu):
+    print(f"Página {pagina}: {total_docs} docs até agora (NSU {ult_nsu}/{max_nsu})")
+
+resultado = consultar_nsu(
+    empresa,
+    estado,
+    state_file=STATE_FILE,   # salva NSU automaticamente a cada página
+    nsu=None,                # None = usa o último NSU do estado; 0 = recomeça do início
+    callback=progresso,      # opcional
+)
+
+if not resultado["sucesso"]:
+    print("Bloqueado:", resultado["motivo"])
+else:
+    print(f"NSU final: {resultado['ultimo_nsu']} / {resultado['max_nsu']}")
+    for doc in resultado["documentos"]:
+        if "erro" in doc:
+            print(f"ERRO NSU {doc['nsu']}: {doc['erro']}")
+        else:
+            print(doc["schema"], doc["nome"])
+            with open(doc["nome"], "w") as f:
+                f.write(doc["xml"])
+
+# estado atualizado com o novo NSU (use para a próxima chamada)
+estado = resultado["estado"]
+salvar_estado(STATE_FILE, estado)
+```
+
+**Retorno:**
+
+| Chave | Tipo | Descrição |
+|---|---|---|
+| `sucesso` | `bool` | `True` quando cStat = 137 ou 138 |
+| `status` | `str` | cStat da última resposta SEFAZ |
+| `motivo` | `str` | xMotivo da última resposta SEFAZ |
+| `ultimo_nsu` | `int` | Último NSU processado |
+| `max_nsu` | `int` | NSU máximo disponível na fila |
+| `documentos` | `list[dict]` | Todos os documentos baixados (mesmo formato de `consultar_dfe_chave`) |
+| `xmls_resposta` | `list[str]` | XMLs brutos de cada página retornada pelo SEFAZ |
+| `estado` | `dict` | Estado atualizado com o novo NSU e eventual cooldown |
+
+> **Cooldown:** se o SEFAZ retornar erro 656 (uso indevido), a distribuição DFe fica bloqueada por ~61 minutos. O nfe-sync registra automaticamente o tempo de bloqueio no `estado` e rejeita novas chamadas com `sucesso=False` e `motivo` indicando o horário de desbloqueio.
+
 ## Requisitos
 
 - Python 3.12+

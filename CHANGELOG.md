@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.39
+- docs: adiciona secao API Python com exemplos de consultar, consultar_dfe_chave e consultar_nsu\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.38
 - refactor: desacoplagem completa com blueprint pattern no CLI\012\012- Cria commands/manifestacao.py (ManifestacaoBlueprint)\012- Cria commands/inutilizacao.py (InutilizacaoBlueprint)\012- Cria commands/emissao.py (EmissaoBlueprint) — corrige bug: subparser emitir estava ausente no cli.py anterior\012- Reescreve cli.py (~80 linhas) como entry point fino que instancia e registra os blueprints\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
