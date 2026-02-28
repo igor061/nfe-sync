@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.16
+- nao salvar XML em downloads quando SEFAZ retornar erro ou rejeicao
+
 ## 0.2.15
 - corrigir leitura de comentarios inline no ini e adicionar signxml as dependencias
 

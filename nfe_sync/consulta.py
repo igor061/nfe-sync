@@ -45,13 +45,17 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
     motivos = xml_sit.xpath("//ns:xMotivo", namespaces=NS)
     situacao = [{"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)]
 
-    cnpj = empresa.emitente.cnpj
-    os.makedirs(f"downloads/{cnpj}", exist_ok=True)
-    xml_sit_str = etree.tostring(xml_sit, encoding="unicode", pretty_print=True)
-    arquivo = f"downloads/{cnpj}/{chave}-situacao.xml"
-    with open(arquivo, "w") as f:
-        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
-        f.write(xml_sit_str)
+    # salva o XML apenas se a SEFAZ retornou um status de sucesso (1xx)
+    primeiro_stat = situacao[0]["status"] if situacao else ""
+    arquivo = None
+    if primeiro_stat.startswith("1"):
+        cnpj = empresa.emitente.cnpj
+        os.makedirs(f"downloads/{cnpj}", exist_ok=True)
+        xml_sit_str = etree.tostring(xml_sit, encoding="unicode", pretty_print=True)
+        arquivo = f"downloads/{cnpj}/{chave}-situacao.xml"
+        with open(arquivo, "w") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n')
+            f.write(xml_sit_str)
 
     return {
         "situacao": situacao,

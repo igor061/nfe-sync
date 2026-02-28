@@ -223,7 +223,8 @@ def cmd_consultar(args):
     for sit in resultado["situacao"]:
         print(f"  cStat={sit['status']}  {sit['motivo']}")
 
-    print(f"  XML salvo em: {resultado['arquivo']}")
+    if resultado["arquivo"]:
+        print(f"  XML salvo em: {resultado['arquivo']}")
 
 
 def cmd_consultar_nsu(args):
