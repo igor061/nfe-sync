@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 
-from pynfe.processamento.comunicacao import ComunicacaoSefaz
 from pynfe.utils import etree
 from pynfe.utils.descompactar import DescompactaGzip
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao
 
 
 COOLDOWN_MINUTOS = 61
@@ -44,24 +44,15 @@ def calcular_proximo_cooldown(minutos: int = COOLDOWN_MINUTOS) -> str:
     return (datetime.now() + timedelta(minutes=minutos)).isoformat(timespec="seconds")
 
 
-def _xml_str(xml_el) -> str:
-    return '<?xml version="1.0" encoding="UTF-8"?>\n' + etree.tostring(xml_el, encoding="unicode", pretty_print=True)
-
-
 def consultar(empresa: EmpresaConfig, chave: str) -> dict:
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     uf = _uf_da_chave(chave) or empresa.uf
-    con = ComunicacaoSefaz(
-        uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
-    )
+    con = criar_comunicacao(empresa, uf=uf)
 
     resp_sit = con.consulta_nota(modelo="nfe", chave=chave)
     xml_sit = etree.fromstring(resp_sit.content)
-    xml_resposta = _xml_str(xml_sit)
-
-    stats = xml_sit.xpath("//ns:cStat", namespaces=NS)
-    motivos = xml_sit.xpath("//ns:xMotivo", namespaces=NS)
-    situacao = [{"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)]
+    xml_resposta = to_xml_string(xml_sit)
+    situacao = extract_status_motivo(xml_sit, NS)
 
     primeiro_stat = situacao[0]["status"] if situacao else ""
     xml = xml_resposta if primeiro_stat.startswith("1") else None
@@ -120,14 +111,13 @@ def _processar_docs(xml_resp) -> list[dict]:
         schema = doc.get("schema", "")
         try:
             xml_doc = DescompactaGzip.descompacta(doc.text)
-            xml_str = etree.tostring(xml_doc, encoding="unicode", pretty_print=True)
             nome, chave = nome_arquivo_nsu(xml_doc, schema, doc_nsu)
             documentos.append({
                 "nsu": doc_nsu,
                 "chave": chave,
                 "schema": schema,
                 "nome": f"{nome}.xml",
-                "xml": '<?xml version="1.0" encoding="UTF-8"?>\n' + xml_str,
+                "xml": to_xml_string(xml_doc),
             })
         except Exception as e:
             documentos.append({
@@ -144,14 +134,13 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj
     uf = _uf_da_chave(chave) or empresa.uf
-    con = ComunicacaoSefaz(
-        uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
-    )
+    con = criar_comunicacao(empresa, uf=uf)
 
     resp = con.consulta_distribuicao(cnpj=cnpj, chave=chave)
     xml_resp = etree.fromstring(resp.content if hasattr(resp, "content") else resp)
-    xml_resposta = _xml_str(xml_resp)
+    xml_resposta = to_xml_string(xml_resp)
 
+    # escalares — não lista; manter inline
     status = xml_resp.xpath("//ns:cStat", namespaces=NS)
     motivo = xml_resp.xpath("//ns:xMotivo", namespaces=NS)
     c_stat = status[0].text if status else None
@@ -190,9 +179,7 @@ def consultar_nsu(
     if nsu is None:
         nsu = get_ultimo_nsu(estado, cnpj)
 
-    con = ComunicacaoSefaz(
-        empresa.uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
-    )
+    con = criar_comunicacao(empresa)
 
     documentos = []
     xmls_resposta = []
@@ -207,9 +194,10 @@ def consultar_nsu(
         resp = con.consulta_distribuicao(cnpj=cnpj, nsu=ult_nsu)
 
         xml_resp = etree.fromstring(resp.content if hasattr(resp, "content") else resp)
+
+        # escalares — não lista
         status = xml_resp.xpath("//ns:cStat", namespaces=NS)
         motivo = xml_resp.xpath("//ns:xMotivo", namespaces=NS)
-
         c_stat = status[0].text if status else None
         x_motivo = motivo[0].text if motivo else None
 
@@ -218,7 +206,7 @@ def consultar_nsu(
         ult_nsu = int(ult_nsu_el[0].text) if ult_nsu_el else ult_nsu
         max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
 
-        xmls_resposta.append(_xml_str(xml_resp))
+        xmls_resposta.append(to_xml_string(xml_resp))
 
         if c_stat != "138":
             break
@@ -236,10 +224,11 @@ def consultar_nsu(
         if ult_nsu >= max_nsu:
             break
 
-    if c_stat not in ("137", "138"):
-        set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
-        if state_file:
-            salvar_estado(state_file, estado)
+    # 137 = fila esgotada, 656 = consumo indevido, outros = erro
+    # Em todos os casos aplica cooldown para evitar nova rejeição imediata
+    set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
+    if state_file:
+        salvar_estado(state_file, estado)
 
     return {
         "sucesso": c_stat in ("137", "138"),

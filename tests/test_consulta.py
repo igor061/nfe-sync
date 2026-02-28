@@ -75,7 +75,7 @@ class TestConsultarNsu:
         assert "bloqueada" in resultado["motivo"]
         assert resultado["documentos"] == []
 
-    @patch("nfe_sync.consulta.ComunicacaoSefaz")
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
     def test_nenhum_documento(self, mock_sefaz_cls, empresa_sul, tmp_path):
         mock_resp = MagicMock()
         mock_resp.content = self.XML_VAZIO
@@ -101,7 +101,7 @@ class TestConsultarNsu:
         </loteDistDFeInt>
     </retDistDFeInt>"""
 
-    @patch("nfe_sync.consulta.ComunicacaoSefaz")
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
     def test_documento_localizado(self, mock_sefaz_cls, empresa_sul, tmp_path):
         resp1 = MagicMock()
         resp1.content = self.XML_COM_DOC
@@ -121,12 +121,12 @@ class TestConsultarNsu:
         assert resultado["documentos"][0]["nsu"] == "000000000000042"
         assert resultado["documentos"][1]["nsu"] == "000000000000100"
 
-        # verifica que salvou estado (sem cooldown quando baixou documentos)
+        # verifica que salvou estado (cooldown sempre aplicado apos consulta)
         estado_salvo = carregar_estado(state_file)
         assert estado_salvo["nsu"][empresa_sul.emitente.cnpj] == 100
-        assert f"{empresa_sul.emitente.cnpj}:homologacao" not in estado_salvo.get("cooldown", {})
+        assert f"{empresa_sul.emitente.cnpj}:homologacao" in estado_salvo.get("cooldown", {})
 
-    @patch("nfe_sync.consulta.ComunicacaoSefaz")
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
     def test_usa_ultimo_nsu_do_estado(self, mock_sefaz_cls, empresa_sul, tmp_path):
         mock_resp = MagicMock()
         mock_resp.content = self.XML_VAZIO
