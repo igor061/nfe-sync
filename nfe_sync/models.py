@@ -1,6 +1,7 @@
 from decimal import Decimal
+import re
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class Certificado(BaseModel):
@@ -22,6 +23,16 @@ class Endereco(BaseModel):
 class Emitente(BaseModel):
     cnpj: str
     razao_social: str = ""
+
+    @field_validator("cnpj")
+    @classmethod
+    def validar_cnpj(cls, v: str) -> str:
+        apenas_digitos = re.sub(r"\D", "", v)
+        if len(apenas_digitos) != 14:
+            raise ValueError(
+                f"CNPJ deve ter 14 digitos (recebeu '{v}' → {len(apenas_digitos)} digitos apos remover formatacao)"
+            )
+        return apenas_digitos
     nome_fantasia: str = ""
     inscricao_estadual: str = ""
     cnae_fiscal: str = ""
