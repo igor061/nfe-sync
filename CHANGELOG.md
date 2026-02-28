@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.45
+- fix: pular distribuicao DFe quando chave pertence ao proprio CNPJ da empresa\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.44
 - fix: aplicar cooldown apenas para status 137 (fila esgotada)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 

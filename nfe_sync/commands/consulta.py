@@ -53,6 +53,10 @@ def cmd_consultar(args):
         print(f"  Protocolo salvo em: {arquivo}")
 
     print()
+    cnpj_chave = args.chave[6:20]
+    if cnpj_chave == cnpj:
+        print("XML completo via distribuicao DFe nao disponivel para NF-e emitida pelo proprio CNPJ.")
+        return
     print("Tentando baixar XML completo via distribuicao DFe...")
     dfe = consultar_dfe_chave(empresa, args.chave)
     _salvar_log_xml(dfe["xml_resposta"], "dist-dfe-chave", args.chave)
