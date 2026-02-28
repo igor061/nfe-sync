@@ -254,7 +254,26 @@ def cmd_consultar_nsu(args):
     def progresso(pagina, total_docs, ult_nsu, max_nsu):
         print(f"  Pagina {pagina}: {total_docs} docs ate agora (NSU {ult_nsu}/{max_nsu})")
 
-    from .consulta import consultar_nsu, listar_resumos_pendentes
+    from .consulta import consultar_nsu, consultar_dfe_chave, listar_resumos_pendentes
+
+    if args.chave:
+        resultado = consultar_dfe_chave(empresa, args.chave)
+        print(f"Status: {resultado.get('status')}")
+        print(f"Motivo: {resultado.get('motivo')}")
+        print(f"Resposta salva em: {resultado['resposta']}")
+        docs = resultado.get("documentos", [])
+        if docs:
+            print(f"Documentos: {len(docs)}")
+            for doc in docs:
+                if "erro" in doc:
+                    print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
+                else:
+                    chave_doc = doc.get("chave") or doc["nsu"]
+                    schema = doc['schema']
+                    tipo = "XML completo (substituiu resumo)" if "procNFe" in schema and doc.get("substituiu_resumo") else ("XML completo" if "procNFe" in schema else "resumo")
+                    print(f"  ({tipo}) chave={chave_doc} — {doc['arquivo']}")
+        return
+
     resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu, callback=progresso)
 
     if not resultado.get("sucesso") and "motivo" in resultado and not resultado.get("status"):
@@ -458,6 +477,7 @@ def cli(argv=None):
     p_nsu.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
     p_nsu.add_argument("--nsu", type=int, default=None, help="NSU inicial (padrao: ultimo NSU salvo)")
     p_nsu.add_argument("--zerar-nsu", action="store_true", help="Zera o NSU salvo e recomeça do inicio (ultimos 90 dias)")
+    p_nsu.add_argument("--chave", default=None, help="Baixar documento DFe de uma chave especifica sem avançar o NSU")
     p_nsu.set_defaults(func=cmd_consultar_nsu)
 
     # pendentes

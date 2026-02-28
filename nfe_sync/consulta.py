@@ -168,6 +168,37 @@ def listar_resumos_pendentes(cnpj: str) -> list[str]:
     return resumos
 
 
+def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
+    """Baixa o documento DFe (procNFe) diretamente pela chave de acesso."""
+    cnpj = empresa.emitente.cnpj
+    con = ComunicacaoSefaz(
+        empresa.uf, empresa.certificado.path, empresa.certificado.senha, empresa.homologacao
+    )
+
+    os.makedirs(f"downloads/{cnpj}", exist_ok=True)
+    resp = con.consulta_distribuicao(cnpj=cnpj, chave=chave)
+    xml_resp = etree.fromstring(resp.content if hasattr(resp, "content") else resp)
+
+    status = xml_resp.xpath("//ns:cStat", namespaces=NS)
+    motivo = xml_resp.xpath("//ns:xMotivo", namespaces=NS)
+    c_stat = status[0].text if status else None
+    x_motivo = motivo[0].text if motivo else None
+
+    arquivo_resp = salvar_resposta_sefaz(xml_resp, "dist-dfe-chave", chave)
+
+    documentos = []
+    if c_stat == "138":
+        _processar_docs(xml_resp, documentos, cnpj)
+
+    return {
+        "sucesso": c_stat == "138",
+        "status": c_stat,
+        "motivo": x_motivo,
+        "documentos": documentos,
+        "resposta": arquivo_resp,
+    }
+
+
 def consultar_nsu(
     empresa: EmpresaConfig, estado: dict, state_file: str, nsu: int | None = None,
     callback=None,
