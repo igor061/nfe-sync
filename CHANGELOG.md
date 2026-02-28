@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.15
+- corrigir leitura de comentarios inline no ini e adicionar signxml as dependencias
+
 ## 0.2.14
 - alinhar conteudo do ini a esquerda para facilitar copia
 

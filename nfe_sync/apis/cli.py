@@ -40,7 +40,7 @@ def cmd_cnpja(args):
 
 
 def _salvar_ini(empresa, nome_secao: str):
-    cfg = configparser.ConfigParser()
+    cfg = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     cfg.read(INI_FILE)
 
     acao = "Atualizada" if cfg.has_section(nome_secao) else "Criada"

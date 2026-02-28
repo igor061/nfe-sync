@@ -42,7 +42,7 @@ def _parse_secao(nome: str, secao: configparser.SectionProxy) -> EmpresaConfig:
 
 
 def carregar_empresas(config_file: str) -> dict[str, EmpresaConfig]:
-    config = configparser.ConfigParser()
+    config = configparser.ConfigParser(inline_comment_prefixes=("#", ";"))
     config.read(config_file)
     secoes = config.sections()
     if not secoes:
