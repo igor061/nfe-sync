@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.23
+- adicionar subcomando pendentes para listar resNFe aguardando XML completo\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.22
 - fluxo automatico resNFe: listar pendentes, manifestar ciencia e baixar procNFe\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 

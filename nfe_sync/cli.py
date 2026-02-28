@@ -343,6 +343,25 @@ def cmd_consultar_nsu(args):
                 print(f"Ainda ha {len(ainda_pendentes)} resumo(s) pendente(s). Execute novamente para tentar novamente.")
 
 
+def cmd_pendentes(args):
+    empresa, estado = _carregar(args)
+    cnpj = empresa.emitente.cnpj
+
+    from .consulta import listar_resumos_pendentes
+    pendentes = listar_resumos_pendentes(cnpj)
+
+    if not pendentes:
+        print(f"Nenhum resumo pendente para {cnpj}.")
+        return
+
+    print(f"NF-e com resumo pendente — {len(pendentes)} chave(s) aguardando XML completo:")
+    for chave in pendentes:
+        print(f"  {chave}")
+    print()
+    print("Para baixar o XML completo:")
+    print(f"  nfe-sync consultar-nsu {args.empresa}")
+
+
 def cmd_manifestar(args):
     empresa, estado = _carregar(args)
 
@@ -397,6 +416,7 @@ def cli(argv=None):
             "  nfe-sync consultar-nsu  EMPRESA\n"
             "  nfe-sync consultar-nsu  EMPRESA --nsu 0\n"
             "  nfe-sync consultar-nsu  EMPRESA --zerar-nsu\n"
+            "  nfe-sync pendentes      EMPRESA\n"
             "  nfe-sync manifestar     EMPRESA ciencia CHAVE\n"
             "  nfe-sync manifestar     EMPRESA nao_realizada CHAVE --justificativa 'Motivo'\n"
             "  nfe-sync inutilizar     EMPRESA --serie 1 --inicio 5 --fim 8 --justificativa 'Motivo'\n"
@@ -439,6 +459,17 @@ def cli(argv=None):
     p_nsu.add_argument("--nsu", type=int, default=None, help="NSU inicial (padrao: ultimo NSU salvo)")
     p_nsu.add_argument("--zerar-nsu", action="store_true", help="Zera o NSU salvo e recomeça do inicio (ultimos 90 dias)")
     p_nsu.set_defaults(func=cmd_consultar_nsu)
+
+    # pendentes
+    p_pendentes = sub.add_parser(
+        "pendentes",
+        help="Listar NF-e com resumo pendente aguardando XML completo",
+        description="Lista as NF-e cujo resumo (resNFe) ja foi baixado mas o XML completo ainda nao foi obtido.",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="Exemplo:\n  nfe-sync pendentes MINHAEMPRESA",
+    )
+    p_pendentes.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
+    p_pendentes.set_defaults(func=cmd_pendentes)
 
     # manifestar
     p_manifestar = sub.add_parser(
