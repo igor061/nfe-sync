@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Uso: ./scripts/commit.sh "mensagem do commit" [--push]
 #
-# Incrementa versao patch, atualiza CHANGELOG.md, faz git commit --no-verify.
+# Incrementa versao patch, atualiza CHANGELOG.md e faz git commit.
 # Passe --push como segundo argumento para fazer git push em seguida.
 
 set -e
@@ -54,7 +54,8 @@ git add "$FILE" "$CHANGELOG"
 
 echo "Versao atualizada: ${current} → ${new_version}"
 
-git commit --no-verify -m "$MSG"
+export NFE_SYNC_COMMIT=1
+git commit -m "$MSG"
 
 if [ "$DO_PUSH" = true ]; then
   git push

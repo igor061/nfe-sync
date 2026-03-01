@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Bloqueia commits diretos via git commit.
+# So permite commits originados pelo scripts/commit.sh (que define NFE_SYNC_COMMIT=1).
+
+if [ "$NFE_SYNC_COMMIT" != "1" ]; then
+  echo ""
+  echo "  BLOQUEADO: use ./scripts/commit.sh \"mensagem\" [--push]"
+  echo ""
+  exit 1
+fi

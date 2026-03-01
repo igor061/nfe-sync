@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.49
+- chore: bloquear git commit direto — obrigar uso de scripts/commit.sh
+
 ## 0.2.48
 - chore: adiciona scripts/commit.sh para commit manual sem dependencia do pre-commit hook\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
