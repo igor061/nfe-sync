@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.48
+- chore: adiciona scripts/commit.sh para commit manual sem dependencia do pre-commit hook\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+
 ## 0.2.47
 - fix: adicionar modificacoes em emissao, inutilizacao e manifestacao (uso de xml_utils)\012\012Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
 
