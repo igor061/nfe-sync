@@ -149,6 +149,62 @@ class TestConsultarNsu:
         )
 
 
+class TestConsultarNsuCallback:
+    """Issue #28: contrato do callback de progresso em consultar_nsu."""
+
+    XML_PAG1 = b"""<?xml version="1.0" encoding="utf-8"?>
+    <retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">
+        <tpAmb>2</tpAmb>
+        <cStat>138</cStat>
+        <xMotivo>Documento localizado</xMotivo>
+        <ultNSU>000000000000042</ultNSU>
+        <maxNSU>000000000000100</maxNSU>
+        <loteDistDFeInt>
+            <docZip NSU="000000000000042" schema="resNFe_v1.01.xsd">H4sIAAAAAAAAA6tWKkktLlGyUlAqS8wpTgUAhRxpOhUAAAA=</docZip>
+        </loteDistDFeInt>
+    </retDistDFeInt>"""
+
+    XML_PAG2 = b"""<?xml version="1.0" encoding="utf-8"?>
+    <retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">
+        <tpAmb>2</tpAmb>
+        <cStat>138</cStat>
+        <xMotivo>Documento localizado</xMotivo>
+        <ultNSU>000000000000100</ultNSU>
+        <maxNSU>000000000000100</maxNSU>
+        <loteDistDFeInt>
+            <docZip NSU="000000000000100" schema="resNFe_v1.01.xsd">H4sIAAAAAAAAA6tWKkktLlGyUlAqS8wpTgUAhRxpOhUAAAA=</docZip>
+        </loteDistDFeInt>
+    </retDistDFeInt>"""
+
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
+    def test_callback_chamado_por_pagina(self, mock_sefaz_cls, empresa_sul, tmp_path):
+        resp1 = MagicMock()
+        resp1.content = self.XML_PAG1
+        resp2 = MagicMock()
+        resp2.content = self.XML_PAG2
+        mock_sefaz_cls.return_value.consulta_distribuicao.side_effect = [resp1, resp2]
+
+        chamadas = []
+        def cb(pagina, total_docs, ult_nsu, max_nsu):
+            chamadas.append((pagina, total_docs, ult_nsu, max_nsu))
+
+        consultar_nsu(empresa_sul, {}, str(tmp_path / "state.json"), callback=cb)
+
+        assert len(chamadas) == 2
+        assert chamadas[0] == (1, 1, 42, 100)
+        assert chamadas[1] == (2, 2, 100, 100)
+
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
+    def test_sem_callback_nao_levanta(self, mock_sefaz_cls, empresa_sul, tmp_path):
+        """callback=None (padrão) não levanta AttributeError."""
+        resp = MagicMock()
+        resp.content = self.XML_PAG2
+        mock_sefaz_cls.return_value.consulta_distribuicao.return_value = resp
+
+        resultado = consultar_nsu(empresa_sul, {}, str(tmp_path / "state.json"))
+        assert resultado.sucesso is True
+
+
 class TestAgoraBrt:
     """Issue #14: _agora_brt retorna datetime sem tzinfo."""
 
