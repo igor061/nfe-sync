@@ -27,6 +27,12 @@ def cmd_emitir(args):
     emi = empresa.emitente
     end = emi.endereco
 
+    if end is None:
+        print("Erro: Emitente sem endereco configurado.")
+        print("Preencha os dados cadastrais com:")
+        print(f"  api_cli cnpjws {emi.cnpj} --salvar-ini {empresa.nome}")
+        sys.exit(1)
+
     dados = DadosEmissao(
         destinatario=Destinatario(
             razao_social="NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL",
