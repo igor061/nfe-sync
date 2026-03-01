@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.50
+- docs: atualizar readme com instrucoes de hook e scripts/commit.sh
+
 ## 0.2.49
 - chore: bloquear git commit direto — obrigar uso de scripts/commit.sh
 

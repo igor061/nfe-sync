@@ -40,10 +40,17 @@ Use os scripts na raiz do projeto, que ativam a virtualenv automaticamente:
 ./run_api_cli --help
 ```
 
-Instale os git hooks para incremento automático de versão e CHANGELOG:
+Instale o hook de commit (obrigatório para contribuir):
 
 ```bash
 ./scripts/install-hooks.sh
+```
+
+Após instalar, use sempre o script de commit no lugar do `git commit` direto:
+
+```bash
+./scripts/commit.sh "mensagem do commit"        # commit com versão incrementada
+./scripts/commit.sh "mensagem do commit" --push  # commit + push
 ```
 
 ## Configuração
