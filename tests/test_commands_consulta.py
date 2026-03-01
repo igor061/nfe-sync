@@ -65,13 +65,13 @@ class TestListarResumosPendentes:
     def test_detecta_arquivo_com_nome_curto(self, tmp_path):
         """Arquivos com nome != 44 chars também devem ser detectados se root tag = resNFe."""
         from nfe_sync.commands import _listar_resumos_pendentes
-        import nfe_sync.commands as cmds_mod
+        import nfe_sync.storage as storage_mod
 
         cnpj = "99999999000191"
 
         with patch("os.path.isdir", return_value=True), \
              patch("os.listdir", return_value=["resumo-curto.xml", "outro.xml"]), \
-             patch.object(cmds_mod, "safe_parse") as mock_parse:
+             patch.object(storage_mod, "safe_parse") as mock_parse:
 
             def fake_parse(path):
                 mock_tree = MagicMock()
@@ -99,12 +99,12 @@ class TestListarResumosPendentes:
     def test_loga_warning_para_xml_invalido(self, tmp_path, caplog):
         """Issue #10: XML inválido deve gerar warning, não engolir silenciosamente."""
         from nfe_sync.commands import _listar_resumos_pendentes
-        import nfe_sync.commands as cmds_mod
+        import nfe_sync.storage as storage_mod
 
         cnpj = "99999999000191"
         with patch("os.path.isdir", return_value=True), \
              patch("os.listdir", return_value=["invalido.xml"]), \
-             patch.object(cmds_mod, "safe_parse", side_effect=Exception("xml quebrado")):
+             patch.object(storage_mod, "safe_parse", side_effect=Exception("xml quebrado")):
             with caplog.at_level(logging.WARNING):
                 resultado = _listar_resumos_pendentes(cnpj)
 
@@ -116,7 +116,7 @@ class TestTratarArquivoCancelado:
     """Issue #10: logging em _tratar_arquivo_cancelado."""
 
     def test_loga_warning_ao_falhar_leitura(self, tmp_path, caplog):
-        import nfe_sync.commands.consulta as consulta_cmds
+        import nfe_sync.storage as storage_mod
         from nfe_sync.commands.consulta import _tratar_arquivo_cancelado
 
         cnpj = "99999999000191"
@@ -124,7 +124,7 @@ class TestTratarArquivoCancelado:
 
         with patch("os.path.exists", return_value=True), \
              patch("os.rename"), \
-             patch.object(consulta_cmds, "safe_parse", side_effect=Exception("parse error")):
+             patch.object(storage_mod, "safe_parse", side_effect=Exception("parse error")):
             with caplog.at_level(logging.WARNING):
                 # Deve continuar sem levantar exceção
                 _tratar_arquivo_cancelado(cnpj, chave)

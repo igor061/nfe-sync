@@ -7,7 +7,10 @@ from ..config import carregar_empresas
 from ..state import carregar_estado, salvar_estado
 from ..log import salvar_resposta_sefaz
 from ..exceptions import NfeConfigError, NfeValidationError
-from ..xml_utils import safe_parse, safe_fromstring
+from ..xml_utils import safe_fromstring
+from ..storage import DocumentoStorage
+
+_storage = DocumentoStorage()
 
 # Issue #4: caminhos de config e estado configuráveis via variáveis de ambiente
 CONFIG_FILE = os.environ.get("NFE_SYNC_CONFIG", "nfe-sync.conf.ini")
@@ -47,12 +50,7 @@ def _carregar(args):
 
 def _salvar_xml(cnpj: str, nome: str, xml: str) -> str:
     """Cria downloads/{cnpj}/ e salva XML. Retorna o caminho do arquivo."""
-    pasta = f"downloads/{cnpj}"
-    os.makedirs(pasta, exist_ok=True)
-    caminho = f"{pasta}/{nome}"
-    with open(caminho, "w") as f:
-        f.write(xml)
-    return caminho
+    return _storage.salvar(cnpj, nome, xml)
 
 
 def _salvar_log_xml(xml_str: str, tipo: str, ref: str) -> str:
@@ -63,21 +61,4 @@ def _salvar_log_xml(xml_str: str, tipo: str, ref: str) -> str:
 
 def _listar_resumos_pendentes(cnpj: str) -> list[str]:
     """Escaneia downloads/{cnpj}/ por arquivos resNFe (root tag = resNFe)."""
-    pasta = f"downloads/{cnpj}"
-    if not os.path.isdir(pasta):
-        return []
-    resumos = []
-    for nome in os.listdir(pasta):
-        if not nome.endswith(".xml"):
-            continue
-        # Issue #9: confiar apenas no root tag XML, sem filtrar por len(nome)
-        try:
-            tree = safe_parse(os.path.join(pasta, nome))
-            root = tree.getroot()
-            local = root.tag.split("}")[-1] if "}" in root.tag else root.tag
-            if local == "resNFe":
-                resumos.append(nome[:-4])
-        except Exception as e:
-            # Issue #10: logar em vez de engolir silenciosamente
-            logging.warning("Arquivo %s ignorado: %s", nome, e)
-    return resumos
+    return _storage.listar_resumos_pendentes(cnpj)

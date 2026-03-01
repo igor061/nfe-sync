@@ -1,14 +1,12 @@
 import argparse
-import logging
 import os
 import sys
 
 from ..state import carregar_estado, salvar_estado, set_ultimo_nsu
 from ..config import carregar_empresas
-from ..xml_utils import safe_parse
 from ..consulta import consultar, consultar_dfe_chave, consultar_nsu
 from ..manifestacao import manifestar
-from . import CliBlueprint, _carregar, _salvar_xml, _salvar_log_xml, _listar_resumos_pendentes, STATE_FILE, CONFIG_FILE
+from . import CliBlueprint, _carregar, _salvar_xml, _salvar_log_xml, _listar_resumos_pendentes, STATE_FILE, CONFIG_FILE, _storage
 
 
 def _tratar_arquivo_cancelado(cnpj: str, chave: str) -> str | None:
@@ -17,21 +15,16 @@ def _tratar_arquivo_cancelado(cnpj: str, chave: str) -> str | None:
     Se o arquivo existente for resNFe, apaga. Se for procNFe ou outro,
     renomeia para -cancelada.xml. Retorna o novo caminho ou None.
     """
-    existente = f"downloads/{cnpj}/{chave}.xml"
-    if not os.path.exists(existente):
+    nome = f"{chave}.xml"
+    if not _storage.existe(cnpj, nome):
         return None
-    try:
-        root_tag = safe_parse(existente).getroot().tag.split("}")[-1]
-    except Exception as e:
-        logging.warning("Nao foi possivel ler %s: %s", existente, e)
-        root_tag = ""
+    root_tag = _storage.root_tag(cnpj, nome) or ""
     if root_tag == "resNFe":
-        os.remove(existente)
+        _storage.remover(cnpj, nome)
         return None
     else:
-        destino = f"downloads/{cnpj}/{chave}-cancelada.xml"
-        os.rename(existente, destino)
-        return destino
+        destino = f"{chave}-cancelada.xml"
+        return _storage.renomear(cnpj, nome, destino)
 
 
 def _processar_e_salvar_docs(cnpj: str, docs: list, prefixo: str = "") -> list[str]:
