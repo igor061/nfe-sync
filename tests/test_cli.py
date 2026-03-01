@@ -45,7 +45,7 @@ class TestFlagsAmbientePos:
         """nfe-sync --homologacao consultar-nsu SUL → empresa.homologacao = True."""
         mock_nsu = MagicMock(return_value=_NSU_OK)
         with patch("nfe_sync.commands.carregar_empresas", return_value=_mock_empresas_prod()), \
-             patch("nfe_sync.consulta.consultar_nsu", mock_nsu), \
+             patch("nfe_sync.commands.consulta.consultar_nsu", mock_nsu), \
              patch("nfe_sync.commands._salvar_log_xml", return_value="x"), \
              patch("nfe_sync.commands.consulta._listar_resumos_pendentes", return_value=[]):
             from nfe_sync.cli import cli
@@ -58,7 +58,7 @@ class TestFlagsAmbientePos:
         """nfe-sync consultar-nsu SUL --homologacao → empresa.homologacao = True."""
         mock_nsu = MagicMock(return_value=_NSU_OK)
         with patch("nfe_sync.commands.carregar_empresas", return_value=_mock_empresas_prod()), \
-             patch("nfe_sync.consulta.consultar_nsu", mock_nsu), \
+             patch("nfe_sync.commands.consulta.consultar_nsu", mock_nsu), \
              patch("nfe_sync.commands._salvar_log_xml", return_value="x"), \
              patch("nfe_sync.commands.consulta._listar_resumos_pendentes", return_value=[]):
             from nfe_sync.cli import cli
@@ -71,7 +71,7 @@ class TestFlagsAmbientePos:
         """nfe-sync consultar-nsu SUL --producao → empresa.homologacao = False."""
         mock_nsu = MagicMock(return_value=_NSU_OK)
         with patch("nfe_sync.commands.carregar_empresas", return_value=_mock_empresas_hom()), \
-             patch("nfe_sync.consulta.consultar_nsu", mock_nsu), \
+             patch("nfe_sync.commands.consulta.consultar_nsu", mock_nsu), \
              patch("nfe_sync.commands._salvar_log_xml", return_value="x"), \
              patch("nfe_sync.commands.consulta._listar_resumos_pendentes", return_value=[]):
             from nfe_sync.cli import cli
@@ -84,7 +84,7 @@ class TestFlagsAmbientePos:
         """nfe-sync consultar-nsu SUL (sem flag) → usa valor do config (homologacao=True)."""
         mock_nsu = MagicMock(return_value=_NSU_OK)
         with patch("nfe_sync.commands.carregar_empresas", return_value=_mock_empresas_hom()), \
-             patch("nfe_sync.consulta.consultar_nsu", mock_nsu), \
+             patch("nfe_sync.commands.consulta.consultar_nsu", mock_nsu), \
              patch("nfe_sync.commands._salvar_log_xml", return_value="x"), \
              patch("nfe_sync.commands.consulta._listar_resumos_pendentes", return_value=[]):
             from nfe_sync.cli import cli
