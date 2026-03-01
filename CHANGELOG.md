@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.63
+- fix: #37 — inutilizacao.py usa chamar_sefaz() em vez de criar_comunicacao direto
+
 ## 0.2.62
 - fix: #35 — corrigir type hints residuais -> dict em emitir() e inutilizar()
 
