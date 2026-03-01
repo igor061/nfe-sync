@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.55
+- fix: #21 — validar chave de acesso localmente antes de enviar a SEFAZ
+
 ## 0.2.54
 - fix: #23 — usar safe_fromstring em _salvar_log_xml (XXE)
 

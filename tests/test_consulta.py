@@ -5,8 +5,10 @@ import pytest
 
 from nfe_sync.consulta import (
     verificar_cooldown, calcular_proximo_cooldown, consultar_nsu,
+    consultar, consultar_dfe_chave,
     _agora_brt, _com_retry, _SALVAR_A_CADA,
 )
+from nfe_sync.exceptions import NfeValidationError
 from nfe_sync.state import carregar_estado
 
 
@@ -294,3 +296,42 @@ class TestProcessarDocsLogging:
         assert "erro" in resultado["documentos"][0]
         # O warning deve ter sido emitido
         assert any("000000000000001" in r.message for r in caplog.records)
+
+
+class TestValidarChave:
+    """Issue #21: validação local da chave de acesso antes de enviar à SEFAZ."""
+
+    CHAVE_VALIDA = "52991299999999999999550010000000011000000010"
+
+    def test_consultar_chave_curta_levanta_erro(self, empresa_sul):
+        with pytest.raises(NfeValidationError, match="44 digitos"):
+            consultar(empresa_sul, "1234")
+
+    def test_consultar_chave_com_letras_levanta_erro(self, empresa_sul):
+        with pytest.raises(NfeValidationError, match="44 digitos"):
+            consultar(empresa_sul, "A" * 44)
+
+    def test_consultar_chave_vazia_levanta_erro(self, empresa_sul):
+        with pytest.raises(NfeValidationError):
+            consultar(empresa_sul, "")
+
+    def test_consultar_chave_valida_nao_levanta(self, empresa_sul):
+        """Chave válida passa a validação e chega até a chamada SEFAZ."""
+        with patch("nfe_sync.xml_utils.ComunicacaoSefaz") as mock_cls:
+            mock_resp = MagicMock()
+            mock_resp.content = (
+                b'<retConsSitNFe xmlns="http://www.portalfiscal.inf.br/nfe">'
+                b"<cStat>100</cStat><xMotivo>Autorizado</xMotivo>"
+                b"</retConsSitNFe>"
+            )
+            mock_cls.return_value.consulta_nota.return_value = mock_resp
+            resultado = consultar(empresa_sul, self.CHAVE_VALIDA)
+        assert resultado["situacao"] is not None
+
+    def test_consultar_dfe_chave_curta_levanta_erro(self, empresa_sul):
+        with pytest.raises(NfeValidationError, match="44 digitos"):
+            consultar_dfe_chave(empresa_sul, "1234")
+
+    def test_consultar_dfe_chave_com_letras_levanta_erro(self, empresa_sul):
+        with pytest.raises(NfeValidationError, match="44 digitos"):
+            consultar_dfe_chave(empresa_sul, "X" * 44)

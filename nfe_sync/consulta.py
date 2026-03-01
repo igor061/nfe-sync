@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
 from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
+from .exceptions import NfeValidationError
 
 
 COOLDOWN_MINUTOS = 61
@@ -136,6 +137,10 @@ def _processar_docs(xml_resp) -> list[dict]:
 
 
 def consultar(empresa: EmpresaConfig, chave: str) -> dict:
+    if len(chave) != 44 or not chave.isdigit():
+        raise NfeValidationError(
+            f"[{empresa.nome}] Chave de acesso deve ter 44 digitos numericos, recebeu: '{chave}'"
+        )
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     uf = _uf_da_chave(chave) or empresa.uf
     con = criar_comunicacao(empresa, uf=uf)
@@ -157,6 +162,10 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
 
 def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     """Baixa o documento DFe (procNFe) diretamente pela chave de acesso."""
+    if len(chave) != 44 or not chave.isdigit():
+        raise NfeValidationError(
+            f"[{empresa.nome}] Chave de acesso deve ter 44 digitos numericos, recebeu: '{chave}'"
+        )
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj
     uf = _uf_da_chave(chave) or empresa.uf
