@@ -6,6 +6,8 @@ import sys
 from ..state import carregar_estado, salvar_estado, set_ultimo_nsu
 from ..config import carregar_empresas
 from ..xml_utils import safe_parse
+from ..consulta import consultar, consultar_dfe_chave, consultar_nsu
+from ..manifestacao import manifestar
 from . import CliBlueprint, _carregar, _salvar_xml, _salvar_log_xml, _listar_resumos_pendentes, STATE_FILE, CONFIG_FILE
 
 
@@ -66,7 +68,6 @@ def cmd_consultar(args):
     print(f"Chave: {args.chave}")
     print()
 
-    from ..consulta import consultar, consultar_dfe_chave
     resultado = consultar(empresa, args.chave)
 
     _salvar_log_xml(resultado["xml_resposta"], "consulta", args.chave)
@@ -77,6 +78,10 @@ def cmd_consultar(args):
     if resultado["xml"]:
         arquivo = _salvar_xml(cnpj, f"{args.chave}-situacao.xml", resultado["xml"])
         print(f"  Protocolo salvo em: {arquivo}")
+
+    primeiro = resultado["situacao"][0]["status"] if resultado["situacao"] else ""
+    if not primeiro.startswith("1"):
+        sys.exit(1)
 
     print()
     cnpj_chave = args.chave[6:20]
@@ -119,8 +124,6 @@ def cmd_consultar_nsu(args):
     def progresso(pagina, total_docs, ult_nsu, max_nsu):
         print(f"  Pagina {pagina}: {total_docs} docs ate agora (NSU {ult_nsu}/{max_nsu})")
 
-    from ..consulta import consultar_nsu, consultar_dfe_chave
-
     if args.chave:
         resultado = consultar_dfe_chave(empresa, args.chave)
         arq_resp = _salvar_log_xml(resultado["xml_resposta"], "dist-dfe-chave", args.chave)
@@ -145,6 +148,9 @@ def cmd_consultar_nsu(args):
 
     if not resultado.get("sucesso") and "motivo" in resultado and not resultado.get("status"):
         print(f"BLOQUEADO: {resultado['motivo']}")
+        sys.exit(1)
+
+    if not resultado.get("sucesso"):
         sys.exit(1)
 
     print(f"Status: {resultado.get('status')}")
@@ -173,7 +179,6 @@ def cmd_consultar_nsu(args):
         except (EOFError, KeyboardInterrupt):
             resposta = ""
         if resposta == "s":
-            from ..manifestacao import manifestar
             print()
             print("Registrando ciencia da operacao...")
             canceladas = []
