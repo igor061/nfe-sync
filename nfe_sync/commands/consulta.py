@@ -1,5 +1,4 @@
 import argparse
-import os
 import sys
 
 from ..state import carregar_estado, salvar_estado, set_ultimo_nsu
@@ -39,9 +38,8 @@ def _processar_e_salvar_docs(cnpj: str, docs: list, prefixo: str = "") -> list[s
         else:
             chave = doc.chave or doc.nsu
             schema = doc.schema
-            arquivo = f"downloads/{cnpj}/{doc.nome}"
-            substituiu = os.path.exists(arquivo) and "procNFe" in schema
-            _salvar_xml(cnpj, doc.nome, doc.xml)
+            substituiu = _storage.existe(cnpj, doc.nome) and "procNFe" in schema
+            arquivo = _salvar_xml(cnpj, doc.nome, doc.xml)
             if "procNFe" in schema:
                 tipo = "XML completo (substituiu resumo)" if substituiu else "XML completo"
                 completos.append(chave)
@@ -187,9 +185,8 @@ def cmd_consultar_nsu(args):
                 except Exception as e:
                     print(f"  {chave[:8]}...  ERRO: {e}")
             for chave in canceladas:
-                resumo = f"downloads/{cnpj}/{chave}.xml"
-                if os.path.exists(resumo):
-                    os.remove(resumo)
+                if _storage.existe(cnpj, f"{chave}.xml"):
+                    _storage.remover(cnpj, f"{chave}.xml")
                     print(f"  {chave[:8]}...  resNFe removido (NF-e cancelada/denegada)")
             print()
             print("Consultando novamente para baixar XML completo...")

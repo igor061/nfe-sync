@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.66
+- fix: #36 — aplicar storage I/O em commands/consulta.py (commit anterior omitiu os arquivos de código)
+
 ## 0.2.65
 - fix: #37 — aplicar refatoração chamar_sefaz() (commit anterior omitiu os arquivos de código)
 
