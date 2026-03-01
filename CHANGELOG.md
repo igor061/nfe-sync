@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.62
+- fix: #35 — corrigir type hints residuais -> dict em emitir() e inutilizar()
+
 ## 0.2.61
 - refactor: #27 — extrair chamar_sefaz() e mover _com_retry para xml_utils
 

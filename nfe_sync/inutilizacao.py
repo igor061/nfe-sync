@@ -13,7 +13,7 @@ def inutilizar(
     num_ini: int,
     num_fim: int,
     justificativa: str,
-) -> dict:
+) -> ResultadoInutilizacao:
     if len(justificativa) < 15:
         raise NfeValidationError(
             f"[{empresa.nome}] Justificativa deve ter no minimo 15 caracteres "

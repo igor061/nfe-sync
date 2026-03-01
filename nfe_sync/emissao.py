@@ -15,7 +15,7 @@ from .results import ResultadoEmissao
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
 
 
-def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmissao) -> dict:
+def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmissao) -> ResultadoEmissao:
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     fonte = FonteDados()
     emi = empresa.emitente
