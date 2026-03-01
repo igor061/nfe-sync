@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.54
+- fix: #23 — usar safe_fromstring em _salvar_log_xml (XXE)
+
 ## 0.2.53
 - fix: resolver issues #16-#19 — XXE em emissao/manifestacao/inutilizacao, timezone BRT compartilhado, timeout SEFAZ via monkey-patch, dedup cmd_consultar_nsu
 
