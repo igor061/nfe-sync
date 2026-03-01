@@ -3,13 +3,11 @@ import os
 import sys
 from abc import ABC, abstractmethod
 
-from pynfe.utils import etree
-
 from ..config import carregar_empresas
 from ..state import carregar_estado, salvar_estado
 from ..log import salvar_resposta_sefaz
 from ..exceptions import NfeConfigError, NfeValidationError
-from ..xml_utils import safe_parse
+from ..xml_utils import safe_parse, safe_fromstring
 
 # Issue #4: caminhos de config e estado configuráveis via variáveis de ambiente
 CONFIG_FILE = os.environ.get("NFE_SYNC_CONFIG", "nfe-sync.conf.ini")
@@ -57,7 +55,7 @@ def _salvar_xml(cnpj: str, nome: str, xml: str) -> str:
 
 def _salvar_log_xml(xml_str: str, tipo: str, ref: str) -> str:
     """Salva resposta SEFAZ em log/. Wrapper sobre log.salvar_resposta_sefaz()."""
-    xml_el = etree.fromstring(xml_str.encode())
+    xml_el = safe_fromstring(xml_str.encode())
     return salvar_resposta_sefaz(xml_el, tipo, ref)
 
 
