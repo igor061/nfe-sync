@@ -33,9 +33,11 @@ def cmd_inutilizar(args):
 
 
 class InutilizacaoBlueprint(CliBlueprint):
-    def register(self, subparsers, parser) -> None:
+    def register(self, subparsers, parser, amb_parent=None) -> None:
+        parents = [amb_parent] if amb_parent else []
         p = subparsers.add_parser(
             "inutilizar",
+            parents=parents,
             help=argparse.SUPPRESS,
             description="Inutiliza uma faixa de numeros de NF-e na SEFAZ.",
             formatter_class=argparse.RawDescriptionHelpFormatter,

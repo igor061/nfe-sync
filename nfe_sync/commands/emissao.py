@@ -92,9 +92,11 @@ def cmd_emitir(args):
 
 
 class EmissaoBlueprint(CliBlueprint):
-    def register(self, subparsers, parser) -> None:
+    def register(self, subparsers, parser, amb_parent=None) -> None:
+        parents = [amb_parent] if amb_parent else []
         p = subparsers.add_parser(
             "emitir",
+            parents=parents,
             help=argparse.SUPPRESS,
             description="Emite uma NF-e de teste em homologacao na SEFAZ.",
             formatter_class=argparse.RawDescriptionHelpFormatter,

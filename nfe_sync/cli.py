@@ -21,6 +21,14 @@ BLUEPRINTS = [
 
 
 def cli(argv=None):
+    # Parser pai para propagar --producao/--homologacao a subparsers (issue #20).
+    # Usa SUPPRESS para não sobrescrever o valor do root parser quando a flag
+    # não é fornecida após o subcomando.
+    amb_parent = argparse.ArgumentParser(add_help=False)
+    _grp = amb_parent.add_mutually_exclusive_group()
+    _grp.add_argument("--producao", action="store_true", default=argparse.SUPPRESS)
+    _grp.add_argument("--homologacao", action="store_true", default=argparse.SUPPRESS)
+
     parser = argparse.ArgumentParser(
         prog="nfe-sync",
         description="Integracao direta com a SEFAZ: consulta, manifestacao e inutilizacao de NF-e.",
@@ -61,7 +69,7 @@ def cli(argv=None):
     ]
 
     for blueprint in BLUEPRINTS:
-        blueprint.register(sub, parser)
+        blueprint.register(sub, parser, amb_parent)
 
     args = parser.parse_args(argv)
 

@@ -106,7 +106,7 @@ def cmd_atualizar(args):
 
 
 class SistemaBlueprint(CliBlueprint):
-    def register(self, subparsers, parser) -> None:
+    def register(self, subparsers, parser, amb_parent=None) -> None:
         p_versao = subparsers.add_parser(
             "versao",
             help=argparse.SUPPRESS,

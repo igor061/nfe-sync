@@ -242,9 +242,12 @@ def cmd_pendentes(args):
 
 
 class ConsultaBlueprint(CliBlueprint):
-    def register(self, subparsers, parser) -> None:
+    def register(self, subparsers, parser, amb_parent=None) -> None:
+        parents = [amb_parent] if amb_parent else []
+
         p_consultar = subparsers.add_parser(
             "consultar",
+            parents=parents,
             help=argparse.SUPPRESS,
             description="Consulta a situacao de uma NF-e diretamente na SEFAZ.",
             formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -256,6 +259,7 @@ class ConsultaBlueprint(CliBlueprint):
 
         p_nsu = subparsers.add_parser(
             "consultar-nsu",
+            parents=parents,
             help=argparse.SUPPRESS,
             description="Consulta a distribuicao DFe na SEFAZ, baixando NF-e e eventos a partir do ultimo NSU salvo.",
             formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -274,6 +278,7 @@ class ConsultaBlueprint(CliBlueprint):
 
         p_pendentes = subparsers.add_parser(
             "pendentes",
+            parents=parents,
             help=argparse.SUPPRESS,
             description="Lista as NF-e cujo resumo (resNFe) ja foi baixado mas o XML completo ainda nao foi obtido.",
             formatter_class=argparse.RawDescriptionHelpFormatter,
