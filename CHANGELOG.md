@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.65
+- fix: #37 — aplicar refatoração chamar_sefaz() (commit anterior omitiu os arquivos de código)
+
 ## 0.2.64
 - fix: #36 — commands/consulta.py usa _storage.existe/remover, remove import os
 

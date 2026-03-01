@@ -1,6 +1,6 @@
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
-from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring
+from .xml_utils import extract_status_motivo, chamar_sefaz
 from .results import ResultadoInutilizacao
 
 
@@ -29,18 +29,12 @@ def inutilizar(
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj
 
-    con = criar_comunicacao(empresa)
-    resposta = con.inutilizacao(
-        modelo="nfe",
-        cnpj=cnpj,
-        numero_inicial=num_ini,
-        numero_final=num_fim,
-        justificativa=justificativa,
-        serie=serie,
+    xml_resp, xml_resp_str = chamar_sefaz(
+        empresa, "inutilizacao",
+        modelo="nfe", cnpj=cnpj,
+        numero_inicial=num_ini, numero_final=num_fim,
+        justificativa=justificativa, serie=serie,
     )
-
-    xml_resp = safe_fromstring(resposta.content)
-    xml_resp_str = to_xml_string(xml_resp)
     resultados = extract_status_motivo(xml_resp, NS)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)
 
