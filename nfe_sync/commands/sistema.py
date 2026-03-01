@@ -5,6 +5,8 @@ import sys
 import urllib.request
 from importlib.metadata import version, PackageNotFoundError
 
+from packaging.version import Version
+
 from . import CliBlueprint
 
 GITHUB_RAW = "https://raw.githubusercontent.com/igor061/nfe-sync/main/pyproject.toml"
@@ -66,7 +68,7 @@ def cmd_versao(args):
     remota = _versao_remota()
     if remota is None:
         print("Nao foi possivel verificar a versao remota.")
-    elif remota == local:
+    elif Version(remota) <= Version(local):
         print(f"Voce esta na versao mais recente ({local}).")
     else:
         print(f"Nova versao disponivel: {remota}")
@@ -94,7 +96,7 @@ def cmd_atualizar(args):
     if remota is None:
         print("Nao foi possivel verificar a versao remota.")
         sys.exit(1)
-    if remota == local:
+    if Version(remota) <= Version(local):
         print(f"Voce ja esta na versao mais recente ({local}).")
         return
     print(f"Atualizando {local} -> {remota}...")

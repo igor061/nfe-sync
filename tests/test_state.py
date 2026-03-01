@@ -33,6 +33,37 @@ class TestSalvarEstado:
         recarregado = carregar_estado(f)
         assert recarregado == estado
 
+    def test_salvar_sobrescreve_conteudo_anterior(self, tmp_path):
+        """Issue #2: salvar_estado deve truncar antes de escrever."""
+        f = str(tmp_path / "state.json")
+        salvar_estado(f, {"a": 1})
+        salvar_estado(f, {"b": 2})
+        recarregado = carregar_estado(f)
+        assert recarregado == {"b": 2}
+        assert "a" not in recarregado
+
+    def test_file_locking_sequencial(self, tmp_path):
+        """Issue #2: múltiplas escritas sequenciais devem manter consistência."""
+        import threading
+        f = str(tmp_path / "state.json")
+        erros = []
+
+        def escrever(valor):
+            try:
+                salvar_estado(f, {"v": valor})
+            except Exception as e:
+                erros.append(e)
+
+        threads = [threading.Thread(target=escrever, args=(i,)) for i in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert erros == []
+        resultado = carregar_estado(f)
+        assert "v" in resultado
+
 
 class TestNumeracao:
     def test_get_inexistente(self):

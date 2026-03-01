@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.51
+- fix: resolver issues #1-#15 — seguranca, validacao, resiliencia e logging
+
 ## 0.2.50
 - docs: atualizar readme com instrucoes de hook e scripts/commit.sh
 

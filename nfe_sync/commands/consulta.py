@@ -1,9 +1,11 @@
 import argparse
+import logging
 import os
 import sys
 
 from ..state import carregar_estado, salvar_estado, set_ultimo_nsu
 from ..config import carregar_empresas
+from ..xml_utils import safe_parse
 from . import CliBlueprint, _carregar, _salvar_xml, _salvar_log_xml, _listar_resumos_pendentes, STATE_FILE, CONFIG_FILE
 
 
@@ -13,13 +15,13 @@ def _tratar_arquivo_cancelado(cnpj: str, chave: str) -> str | None:
     Se o arquivo existente for resNFe, apaga. Se for procNFe ou outro,
     renomeia para -cancelada.xml. Retorna o novo caminho ou None.
     """
-    from pynfe.utils import etree
     existente = f"downloads/{cnpj}/{chave}.xml"
     if not os.path.exists(existente):
         return None
     try:
-        root_tag = etree.parse(existente).getroot().tag.split("}")[-1]
-    except Exception:
+        root_tag = safe_parse(existente).getroot().tag.split("}")[-1]
+    except Exception as e:
+        logging.warning("Nao foi possivel ler %s: %s", existente, e)
         root_tag = ""
     if root_tag == "resNFe":
         os.remove(existente)
@@ -28,6 +30,30 @@ def _tratar_arquivo_cancelado(cnpj: str, chave: str) -> str | None:
         destino = f"downloads/{cnpj}/{chave}-cancelada.xml"
         os.rename(existente, destino)
         return destino
+
+
+def _processar_e_salvar_docs(cnpj: str, docs: list, prefixo: str = "") -> list[str]:
+    """Salva XMLs e imprime tipo/chave. Retorna chaves de procNFe baixados.
+
+    Issue #8: elimina duplicação de blocos de processamento de documentos.
+    """
+    completos = []
+    for doc in docs:
+        if "erro" in doc:
+            print(f"  {prefixo}NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
+        else:
+            chave = doc.get("chave") or doc["nsu"]
+            schema = doc["schema"]
+            arquivo = f"downloads/{cnpj}/{doc['nome']}"
+            substituiu = os.path.exists(arquivo) and "procNFe" in schema
+            _salvar_xml(cnpj, doc["nome"], doc["xml"])
+            if "procNFe" in schema:
+                tipo = "XML completo (substituiu resumo)" if substituiu else "XML completo"
+                completos.append(chave)
+            else:
+                tipo = "resumo"
+            print(f"  {prefixo}({tipo}) chave={chave} — {arquivo}")
+    return completos
 
 
 def cmd_consultar(args):
@@ -69,22 +95,9 @@ def cmd_consultar(args):
         if arq_cancelada:
             print(f"  NF-e renomeada para: {arq_cancelada}")
 
-    for doc in dfe.get("documentos", []):
-        if "erro" in doc:
-            print(f"  ERRO: {doc['erro']}")
-        else:
-            chave_doc = doc.get("chave") or doc["nsu"]
-            schema = doc["schema"]
-            arquivo_existente = f"downloads/{cnpj}/{doc['nome']}"
-            substituiu_resumo = os.path.exists(arquivo_existente) and "procNFe" in schema
-            _salvar_xml(cnpj, doc["nome"], doc["xml"])
-            if "procNFe" in schema and substituiu_resumo:
-                tipo = "XML completo (substituiu resumo)"
-            elif "procNFe" in schema:
-                tipo = "XML completo"
-            else:
-                tipo = "resumo"
-            print(f"  ({tipo}) — {arquivo_existente}")
+    docs = dfe.get("documentos", [])
+    if docs:
+        _processar_e_salvar_docs(cnpj, docs)
 
 
 def cmd_consultar_nsu(args):
@@ -125,17 +138,7 @@ def cmd_consultar_nsu(args):
         docs = resultado.get("documentos", [])
         if docs:
             print(f"Documentos: {len(docs)}")
-            for doc in docs:
-                if "erro" in doc:
-                    print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
-                else:
-                    chave_doc = doc.get("chave") or doc["nsu"]
-                    schema = doc["schema"]
-                    arquivo_existente = f"downloads/{cnpj}/{doc['nome']}"
-                    substituiu_resumo = os.path.exists(arquivo_existente) and "procNFe" in schema
-                    _salvar_xml(cnpj, doc["nome"], doc["xml"])
-                    tipo = "XML completo (substituiu resumo)" if "procNFe" in schema and substituiu_resumo else ("XML completo" if "procNFe" in schema else "resumo")
-                    print(f"  ({tipo}) chave={chave_doc} — {arquivo_existente}")
+            _processar_e_salvar_docs(cnpj, docs)
         return
 
     resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu, callback=progresso)
@@ -212,29 +215,12 @@ def cmd_consultar_nsu(args):
             print(f"Status: {resultado2.get('status')}")
             print(f"Motivo: {resultado2.get('motivo')}")
             docs2 = resultado2.get("documentos", [])
-            completos = []
             if docs2:
                 print(f"Documentos: {len(docs2)}")
-                for doc in docs2:
-                    if "erro" in doc:
-                        print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
-                    else:
-                        chave = doc.get("chave") or doc["nsu"]
-                        schema = doc["schema"]
-                        arquivo_existente = f"downloads/{cnpj}/{doc['nome']}"
-                        substituiu_resumo = os.path.exists(arquivo_existente) and "procNFe" in schema
-                        _salvar_xml(cnpj, doc["nome"], doc["xml"])
-                        if "procNFe" in schema and substituiu_resumo:
-                            tipo = "XML completo (substituiu resumo)"
-                            completos.append(chave)
-                        elif "procNFe" in schema:
-                            tipo = "XML completo"
-                        else:
-                            tipo = "resumo"
-                        print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {arquivo_existente}")
-            if completos:
-                print()
-                print(f"XML completo baixado para {len(completos)} NF-e(s).")
+                completos = _processar_e_salvar_docs(cnpj, docs2, prefixo=f"NSU ... ")
+                if completos:
+                    print()
+                    print(f"XML completo baixado para {len(completos)} NF-e(s).")
             ainda_pendentes = _listar_resumos_pendentes(cnpj)
             if ainda_pendentes:
                 print()

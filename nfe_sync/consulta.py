@@ -1,15 +1,24 @@
-from datetime import datetime, timedelta
-
-from pynfe.utils import etree
-from pynfe.utils.descompactar import DescompactaGzip
+import logging
+import time
+import traceback
+from datetime import datetime, timedelta, timezone
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
-from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring
 
 
 COOLDOWN_MINUTOS = 61
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
+
+# Issue #14: timezone BRT (UTC-3) para timestamps consistentes
+_BRT = timezone(timedelta(hours=-3))
+
+
+def _agora_brt() -> datetime:
+    """Retorna o datetime atual no fuso BRT (UTC-3) sem informação de timezone."""
+    return datetime.now(_BRT).replace(tzinfo=None)
+
 
 COD_UF = {
     "11": "ro", "12": "ac", "13": "am", "14": "rr", "15": "pa",
@@ -30,7 +39,7 @@ def verificar_cooldown(bloqueado_ate: str | None) -> tuple[bool, str]:
         return False, ""
     try:
         dt = datetime.fromisoformat(bloqueado_ate)
-        agora = datetime.now()
+        agora = _agora_brt()
         if agora < dt:
             restante = dt - agora
             mins = int(restante.total_seconds() / 60)
@@ -41,28 +50,23 @@ def verificar_cooldown(bloqueado_ate: str | None) -> tuple[bool, str]:
 
 
 def calcular_proximo_cooldown(minutos: int = COOLDOWN_MINUTOS) -> str:
-    return (datetime.now() + timedelta(minutes=minutos)).isoformat(timespec="seconds")
+    return (_agora_brt() + timedelta(minutes=minutos)).isoformat(timespec="seconds")
 
 
-def consultar(empresa: EmpresaConfig, chave: str) -> dict:
-    validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
-    uf = _uf_da_chave(chave) or empresa.uf
-    con = criar_comunicacao(empresa, uf=uf)
+# Issue #5: retry com backoff exponencial
+def _com_retry(fn, *args, tentativas=3, base=5, **kwargs):
+    """Chama fn(*args, **kwargs) com retry exponencial (tentativas x, delay base*2^n segundos)."""
+    for n in range(tentativas):
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            if n == tentativas - 1:
+                raise
+            time.sleep(base * (2 ** n))
 
-    resp_sit = con.consulta_nota(modelo="nfe", chave=chave)
-    xml_sit = etree.fromstring(resp_sit.content)
-    xml_resposta = to_xml_string(xml_sit)
-    situacao = extract_status_motivo(xml_sit, NS)
 
-    primeiro_stat = situacao[0]["status"] if situacao else ""
-    xml = xml_resposta if primeiro_stat.startswith("1") else None
-
-    return {
-        "situacao": situacao,
-        "xml": xml,
-        "xml_resposta": xml_resposta,
-    }
-
+# Issue #7: salvar estado a cada N páginas
+_SALVAR_A_CADA = 10
 
 TIPOS_EVENTO = {
     "110110": "carta-correcao",
@@ -103,6 +107,7 @@ def nome_arquivo_nsu(xml_doc, schema: str, fallback: str) -> tuple[str, str | No
 
 
 def _processar_docs(xml_resp) -> list[dict]:
+    from pynfe.utils.descompactar import DescompactaGzip
     docs_xml = xml_resp.xpath("//ns:docZip", namespaces=NS)
     documentos = []
 
@@ -120,6 +125,10 @@ def _processar_docs(xml_resp) -> list[dict]:
                 "xml": to_xml_string(xml_doc),
             })
         except Exception as e:
+            # Issue #1: logar traceback completo para diagnóstico
+            logging.warning(
+                "NSU %s: erro ao processar documento\n%s", doc_nsu, traceback.format_exc()
+            )
             documentos.append({
                 "nsu": doc_nsu,
                 "schema": schema,
@@ -129,6 +138,26 @@ def _processar_docs(xml_resp) -> list[dict]:
     return documentos
 
 
+def consultar(empresa: EmpresaConfig, chave: str) -> dict:
+    validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
+    uf = _uf_da_chave(chave) or empresa.uf
+    con = criar_comunicacao(empresa, uf=uf)
+
+    resp_sit = _com_retry(con.consulta_nota, modelo="nfe", chave=chave)
+    xml_sit = safe_fromstring(resp_sit.content)
+    xml_resposta = to_xml_string(xml_sit)
+    situacao = extract_status_motivo(xml_sit, NS)
+
+    primeiro_stat = situacao[0]["status"] if situacao else ""
+    xml = xml_resposta if primeiro_stat.startswith("1") else None
+
+    return {
+        "situacao": situacao,
+        "xml": xml,
+        "xml_resposta": xml_resposta,
+    }
+
+
 def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     """Baixa o documento DFe (procNFe) diretamente pela chave de acesso."""
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
@@ -136,8 +165,8 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     uf = _uf_da_chave(chave) or empresa.uf
     con = criar_comunicacao(empresa, uf=uf)
 
-    resp = con.consulta_distribuicao(cnpj=cnpj, chave=chave)
-    xml_resp = etree.fromstring(resp.content if hasattr(resp, "content") else resp)
+    resp = _com_retry(con.consulta_distribuicao, cnpj=cnpj, chave=chave)
+    xml_resp = safe_fromstring(resp.content if hasattr(resp, "content") else resp)
     xml_resposta = to_xml_string(xml_resp)
 
     # escalares — não lista; manter inline
@@ -191,9 +220,9 @@ def consultar_nsu(
 
     while True:
         pagina += 1
-        resp = con.consulta_distribuicao(cnpj=cnpj, nsu=ult_nsu)
+        resp = _com_retry(con.consulta_distribuicao, cnpj=cnpj, nsu=ult_nsu)
 
-        xml_resp = etree.fromstring(resp.content if hasattr(resp, "content") else resp)
+        xml_resp = safe_fromstring(resp.content if hasattr(resp, "content") else resp)
 
         # escalares — não lista
         status = xml_resp.xpath("//ns:cStat", namespaces=NS)
@@ -215,8 +244,10 @@ def consultar_nsu(
         documentos.extend(docs)
 
         set_ultimo_nsu(estado, cnpj, ult_nsu)
-        if state_file:
-            salvar_estado(state_file, estado)
+        # Issue #7: salvar estado a cada _SALVAR_A_CADA páginas ou na última
+        if pagina % _SALVAR_A_CADA == 0 or ult_nsu >= max_nsu:
+            if state_file:
+                salvar_estado(state_file, estado)
 
         if callback:
             callback(pagina, len(documentos), ult_nsu, max_nsu)

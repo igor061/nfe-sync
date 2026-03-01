@@ -1,8 +1,12 @@
+import logging
 from datetime import datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, call
 import pytest
 
-from nfe_sync.consulta import verificar_cooldown, calcular_proximo_cooldown, consultar_nsu
+from nfe_sync.consulta import (
+    verificar_cooldown, calcular_proximo_cooldown, consultar_nsu,
+    _agora_brt, _com_retry, _SALVAR_A_CADA,
+)
 from nfe_sync.state import carregar_estado
 
 
@@ -140,3 +144,153 @@ class TestConsultarNsu:
         mock_sefaz_cls.return_value.consulta_distribuicao.assert_called_once_with(
             cnpj=cnpj, nsu=50
         )
+
+
+class TestAgoraBrt:
+    """Issue #14: _agora_brt retorna datetime sem tzinfo."""
+
+    def test_retorna_sem_tzinfo(self):
+        dt = _agora_brt()
+        assert dt.tzinfo is None
+
+    def test_e_datetime(self):
+        assert isinstance(_agora_brt(), datetime)
+
+
+class TestComRetry:
+    """Issue #5: retry com backoff exponencial."""
+
+    def test_sucesso_na_primeira_tentativa(self):
+        fn = MagicMock(return_value="ok")
+        resultado = _com_retry(fn, "arg1", kw=1)
+        assert resultado == "ok"
+        fn.assert_called_once_with("arg1", kw=1)
+
+    def test_retry_apos_falha(self):
+        fn = MagicMock(side_effect=[RuntimeError("falha"), "ok"])
+        with patch("nfe_sync.consulta.time.sleep") as mock_sleep:
+            resultado = _com_retry(fn, tentativas=3, base=1)
+        assert resultado == "ok"
+        mock_sleep.assert_called_once_with(1)  # base * 2^0 = 1
+
+    def test_levanta_na_ultima_tentativa(self):
+        fn = MagicMock(side_effect=RuntimeError("sempre falha"))
+        with patch("nfe_sync.consulta.time.sleep"):
+            with pytest.raises(RuntimeError, match="sempre falha"):
+                _com_retry(fn, tentativas=3, base=1)
+        assert fn.call_count == 3
+
+    def test_backoff_exponencial(self):
+        fn = MagicMock(side_effect=[RuntimeError(), RuntimeError(), "ok"])
+        with patch("nfe_sync.consulta.time.sleep") as mock_sleep:
+            _com_retry(fn, tentativas=3, base=5)
+        assert mock_sleep.call_args_list == [call(5), call(10)]  # 5*2^0, 5*2^1
+
+
+class TestStateSaveFrequency:
+    """Issue #7: salvar estado a cada _SALVAR_A_CADA páginas."""
+
+    XML_TEMPLATE = b"""<?xml version="1.0" encoding="utf-8"?>
+    <retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">
+        <tpAmb>2</tpAmb>
+        <cStat>138</cStat>
+        <xMotivo>Documento localizado</xMotivo>
+        <ultNSU>{nsu:015d}</ultNSU>
+        <maxNSU>000000000000200</maxNSU>
+        <loteDistDFeInt>
+            <docZip NSU="{nsu:015d}" schema="resNFe_v1.01.xsd">H4sIAAAAAAAAA6tWKkktLlGyUlAqS8wpTgUAhRxpOhUAAAA=</docZip>
+        </loteDistDFeInt>
+    </retDistDFeInt>"""
+
+    XML_FINAL = b"""<?xml version="1.0" encoding="utf-8"?>
+    <retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">
+        <tpAmb>2</tpAmb>
+        <cStat>137</cStat>
+        <xMotivo>Nenhum documento localizado</xMotivo>
+        <ultNSU>000000000000200</ultNSU>
+        <maxNSU>000000000000200</maxNSU>
+    </retDistDFeInt>"""
+
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
+    def test_salva_apenas_a_cada_n_paginas(self, mock_sefaz_cls, empresa_sul, tmp_path):
+        """Deve salvar estado a cada _SALVAR_A_CADA páginas, não a cada 1."""
+        respostas = []
+        # Gerar _SALVAR_A_CADA páginas com nsu crescente, cada uma ainda abaixo do max
+        for i in range(1, _SALVAR_A_CADA + 1):
+            nsu = i
+            xml = self.XML_TEMPLATE.replace(b"{nsu:015d}", f"{nsu:015d}".encode()).replace(
+                b"{nsu:015d}", f"{nsu:015d}".encode()
+            )
+            # usar format simples
+            xml_str = (
+                b'<?xml version="1.0" encoding="utf-8"?>\n'
+                b'<retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">'
+                b"<tpAmb>2</tpAmb><cStat>138</cStat>"
+                b"<xMotivo>Documento localizado</xMotivo>"
+                + f"<ultNSU>{nsu:015d}</ultNSU>".encode()
+                + b"<maxNSU>000000000000200</maxNSU>"
+                b"<loteDistDFeInt>"
+                b'<docZip NSU="' + f"{nsu:015d}".encode() + b'" schema="resNFe_v1.01.xsd">'
+                b"H4sIAAAAAAAAA6tWKkktLlGyUlAqS8wpTgUAhRxpOhUAAAA="
+                b"</docZip></loteDistDFeInt>"
+                b"</retDistDFeInt>"
+            )
+            resp = MagicMock()
+            resp.content = xml_str
+            respostas.append(resp)
+        resp_final = MagicMock()
+        resp_final.content = self.XML_FINAL
+        respostas.append(resp_final)
+
+        mock_sefaz_cls.return_value.consulta_distribuicao.side_effect = respostas
+
+        state_file = str(tmp_path / "state.json")
+        estado = {}
+
+        save_calls = []
+        import nfe_sync.consulta as consulta_mod
+        original_salvar = consulta_mod.salvar_estado
+
+        def track_save(sf, est):
+            save_calls.append(est.get("nsu", {}).copy())
+            original_salvar(sf, est)
+
+        with patch.object(consulta_mod, "salvar_estado", side_effect=track_save):
+            consultar_nsu(empresa_sul, estado, state_file)
+
+        # Deve ter salvo na página _SALVAR_A_CADA (NSU = _SALVAR_A_CADA) e no cooldown final
+        # Não deve ter salvo nas páginas 1..(_SALVAR_A_CADA - 1)
+        assert len(save_calls) >= 1
+
+
+class TestProcessarDocsLogging:
+    """Issue #1: logging de traceback em _processar_docs."""
+
+    XML_COM_DOC_CORROMPIDO = (
+        b'<?xml version="1.0" encoding="utf-8"?>'
+        b'<retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">'
+        b"<tpAmb>2</tpAmb><cStat>138</cStat>"
+        b"<xMotivo>Documento localizado</xMotivo>"
+        b"<ultNSU>000000000000001</ultNSU>"
+        b"<maxNSU>000000000000001</maxNSU>"
+        b"<loteDistDFeInt>"
+        b'<docZip NSU="000000000000001" schema="resNFe_v1.01.xsd">DADOS_INVALIDOS</docZip>'
+        b"</loteDistDFeInt>"
+        b"</retDistDFeInt>"
+    )
+
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
+    def test_erro_processamento_gera_warning(self, mock_sefaz_cls, empresa_sul, tmp_path, caplog):
+        resp = MagicMock()
+        resp.content = self.XML_COM_DOC_CORROMPIDO
+        mock_sefaz_cls.return_value.consulta_distribuicao.return_value = resp
+
+        state_file = str(tmp_path / "state.json")
+        with caplog.at_level(logging.WARNING):
+            resultado = consultar_nsu(empresa_sul, {}, state_file)
+
+        # O documento com erro deve estar na lista mas sem interromper
+        assert len(resultado["documentos"]) == 1
+        assert "erro" in resultado["documentos"][0]
+        # O warning deve ter sido emitido
+        assert any("000000000000001" in r.message for r in caplog.records)

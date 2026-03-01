@@ -6,13 +6,38 @@ from pydantic import BaseModel, field_validator
 from .exceptions import NfeValidationError
 
 
+def _calcular_dv_cnpj(cnpj14: str) -> bool:
+    """Valida os dois dígitos verificadores do CNPJ pelo algoritmo mod-11."""
+    pesos1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    pesos2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+
+    def _dv(digitos, pesos):
+        soma = sum(int(d) * p for d, p in zip(digitos, pesos))
+        resto = soma % 11
+        return 0 if resto < 2 else 11 - resto
+
+    dv1 = _dv(cnpj14[:12], pesos1)
+    dv2 = _dv(cnpj14[:13], pesos2)
+    return int(cnpj14[12]) == dv1 and int(cnpj14[13]) == dv2
+
+
 def validar_cnpj_sefaz(cnpj: str, contexto: str = "") -> None:
-    """Lança NfeValidationError se o CNPJ não tiver exatamente 14 dígitos numéricos."""
+    """Lança NfeValidationError se o CNPJ não for válido (14 dígitos + mod-11)."""
     prefixo = f"[{contexto}] " if contexto else ""
     if len(cnpj) != 14 or not cnpj.isdigit():
         raise NfeValidationError(
             f"{prefixo}CNPJ invalido para chamada SEFAZ: '{cnpj}' "
             f"(deve ter 14 digitos numericos, tem {len(cnpj)})"
+        )
+    if cnpj == cnpj[0] * 14:
+        raise NfeValidationError(
+            f"{prefixo}CNPJ invalido para chamada SEFAZ: '{cnpj}' "
+            f"(todos os digitos iguais)"
+        )
+    if not _calcular_dv_cnpj(cnpj):
+        raise NfeValidationError(
+            f"{prefixo}CNPJ invalido para chamada SEFAZ: '{cnpj}' "
+            f"(digitos verificadores incorretos)"
         )
 
 
@@ -43,6 +68,14 @@ class Emitente(BaseModel):
         if len(apenas_digitos) != 14:
             raise ValueError(
                 f"CNPJ deve ter 14 digitos (recebeu '{v}' → {len(apenas_digitos)} digitos apos remover formatacao)"
+            )
+        if apenas_digitos == apenas_digitos[0] * 14:
+            raise ValueError(
+                f"CNPJ invalido: todos os digitos sao iguais ('{apenas_digitos}')"
+            )
+        if not _calcular_dv_cnpj(apenas_digitos):
+            raise ValueError(
+                f"CNPJ invalido: digitos verificadores incorretos ('{apenas_digitos}')"
             )
         return apenas_digitos
     nome_fantasia: str = ""

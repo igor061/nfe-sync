@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from abc import ABC, abstractmethod
@@ -8,9 +9,11 @@ from ..config import carregar_empresas
 from ..state import carregar_estado, salvar_estado
 from ..log import salvar_resposta_sefaz
 from ..exceptions import NfeConfigError, NfeValidationError
+from ..xml_utils import safe_parse
 
-CONFIG_FILE = "nfe-sync.conf.ini"
-STATE_FILE = ".state.json"
+# Issue #4: caminhos de config e estado configuráveis via variáveis de ambiente
+CONFIG_FILE = os.environ.get("NFE_SYNC_CONFIG", "nfe-sync.conf.ini")
+STATE_FILE = os.environ.get("NFE_SYNC_STATE", ".state.json")
 
 
 class CliBlueprint(ABC):
@@ -67,14 +70,14 @@ def _listar_resumos_pendentes(cnpj: str) -> list[str]:
     for nome in os.listdir(pasta):
         if not nome.endswith(".xml"):
             continue
-        if len(nome) != 48:
-            continue
+        # Issue #9: confiar apenas no root tag XML, sem filtrar por len(nome)
         try:
-            tree = etree.parse(os.path.join(pasta, nome))
+            tree = safe_parse(os.path.join(pasta, nome))
             root = tree.getroot()
             local = root.tag.split("}")[-1] if "}" in root.tag else root.tag
             if local == "resNFe":
                 resumos.append(nome[:-4])
-        except Exception:
-            pass
+        except Exception as e:
+            # Issue #10: logar em vez de engolir silenciosamente
+            logging.warning("Arquivo %s ignorado: %s", nome, e)
     return resumos
