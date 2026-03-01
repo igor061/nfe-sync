@@ -126,3 +126,128 @@ class TestTratarArquivoCancelado:
                 _tratar_arquivo_cancelado(cnpj, chave)
 
         assert any("parse error" in r.message or chave in r.message for r in caplog.records)
+
+
+class TestCmdConsultarExitCode:
+    """Issue #22: cmd_consultar deve retornar exit code 1 para status de erro SEFAZ."""
+
+    def _make_mock_empresa(self):
+        from nfe_sync.models import EmpresaConfig, Certificado, Emitente
+        return EmpresaConfig(
+            nome="SUL",
+            certificado=Certificado(path="/tmp/cert.pfx", senha="123456"),
+            emitente=Emitente(cnpj="99999999000191"),
+            uf="sp",
+            homologacao=True,
+        )
+
+    def _make_args(self, chave="52991299999999999999550010000000011000000010"):
+        args = MagicMock()
+        args.chave = chave
+        args.empresa = "SUL"
+        args.producao = False
+        args.homologacao = False
+        return args
+
+    @patch("nfe_sync.commands.consulta._carregar")
+    @patch("nfe_sync.commands.consulta._salvar_log_xml")
+    @patch("nfe_sync.commands.consulta.consultar")
+    def test_status_215_sai_com_codigo_1(self, mock_consultar, mock_log, mock_carregar):
+        """cStat=215 (rejeição) → exit code 1."""
+        mock_carregar.return_value = (self._make_mock_empresa(), {})
+        mock_log.return_value = "log/x.xml"
+        mock_consultar.return_value = {
+            "situacao": [{"status": "215", "motivo": "Rejeicao: CNPJ invalido"}],
+            "xml": None,
+            "xml_resposta": "<resp/>",
+        }
+
+        from nfe_sync.commands.consulta import cmd_consultar
+        with pytest.raises(SystemExit) as exc:
+            cmd_consultar(self._make_args())
+        assert exc.value.code == 1
+
+    @patch("nfe_sync.commands.consulta._carregar")
+    @patch("nfe_sync.commands.consulta._salvar_log_xml")
+    @patch("nfe_sync.commands.consulta.consultar")
+    @patch("nfe_sync.commands.consulta.consultar_dfe_chave")
+    def test_status_100_nao_sai(self, mock_dfe, mock_consultar, mock_log, mock_carregar):
+        """cStat=100 (autorizado) → sem SystemExit."""
+        mock_carregar.return_value = (self._make_mock_empresa(), {})
+        mock_log.return_value = "log/x.xml"
+        mock_consultar.return_value = {
+            "situacao": [{"status": "100", "motivo": "Autorizado o uso da NF-e"}],
+            "xml": "<procNFe/>",
+            "xml_resposta": "<resp/>",
+        }
+        mock_dfe.return_value = {
+            "status": "138",
+            "motivo": "Documento localizado",
+            "xml_cancelamento": None,
+            "documentos": [],
+            "xml_resposta": "<resp/>",
+        }
+
+        with patch("nfe_sync.commands.consulta._salvar_xml"):
+            from nfe_sync.commands.consulta import cmd_consultar
+            cmd_consultar(self._make_args())  # não deve levantar SystemExit
+
+    @patch("nfe_sync.commands.consulta._carregar")
+    @patch("nfe_sync.commands.consulta._salvar_log_xml")
+    @patch("nfe_sync.commands.consulta.consultar_nsu")
+    def test_nsu_status_589_sai_com_codigo_1(self, mock_nsu, mock_log, mock_carregar, tmp_path):
+        """consultar_nsu com status 589 (erro) → exit code 1."""
+        mock_carregar.return_value = (self._make_mock_empresa(), {})
+        mock_log.return_value = "log/x.xml"
+        mock_nsu.return_value = {
+            "sucesso": False,
+            "status": "589",
+            "motivo": "Rejeicao: acesso negado",
+            "ultimo_nsu": 0,
+            "max_nsu": 0,
+            "documentos": [],
+            "xmls_resposta": ["<resp/>"],
+            "estado": {},
+        }
+
+        args = MagicMock()
+        args.empresa = "SUL"
+        args.nsu = None
+        args.zerar_nsu = False
+        args.chave = None
+        args.producao = False
+        args.homologacao = False
+
+        from nfe_sync.commands.consulta import cmd_consultar_nsu
+        with pytest.raises(SystemExit) as exc:
+            cmd_consultar_nsu(args)
+        assert exc.value.code == 1
+
+    @patch("nfe_sync.commands.consulta._carregar")
+    @patch("nfe_sync.commands.consulta._salvar_log_xml")
+    @patch("nfe_sync.commands.consulta.consultar_nsu")
+    def test_nsu_status_137_nao_sai(self, mock_nsu, mock_log, mock_carregar, tmp_path):
+        """consultar_nsu com status 137 (sem docs) → sem SystemExit."""
+        mock_carregar.return_value = (self._make_mock_empresa(), {})
+        mock_log.return_value = "log/x.xml"
+        mock_nsu.return_value = {
+            "sucesso": True,
+            "status": "137",
+            "motivo": "Nenhum documento localizado",
+            "ultimo_nsu": 0,
+            "max_nsu": 0,
+            "documentos": [],
+            "xmls_resposta": ["<resp/>"],
+            "estado": {},
+        }
+
+        args = MagicMock()
+        args.empresa = "SUL"
+        args.nsu = None
+        args.zerar_nsu = False
+        args.chave = None
+        args.producao = False
+        args.homologacao = False
+
+        from nfe_sync.commands.consulta import cmd_consultar_nsu
+        cmd_consultar_nsu(args)  # não deve levantar SystemExit

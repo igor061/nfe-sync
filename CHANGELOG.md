@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.56
+- fix: #22 — exit code 1 para status de erro SEFAZ em cmd_consultar e cmd_consultar_nsu
+
 ## 0.2.55
 - fix: #21 — validar chave de acesso localmente antes de enviar a SEFAZ
 
