@@ -66,27 +66,27 @@ def cmd_emitir(args):
     from ..emissao import emitir
     resultado = emitir(empresa, serie, numero_nf, dados)
 
-    if resultado.get("sucesso"):
-        _salvar_log_xml(resultado["xml"], "emissao", cnpj)
+    if resultado.sucesso:
+        _salvar_log_xml(resultado.xml, "emissao", cnpj)
         os.makedirs("xml", exist_ok=True)
-        arquivo = f"xml/{resultado['chave']}.xml"
+        arquivo = f"xml/{resultado.chave}.xml"
         with open(arquivo, "w") as f:
-            f.write(resultado["xml"])
+            f.write(resultado.xml)
 
-        print(f"Status: {resultado['status']}")
-        print(f"Motivo: {resultado['motivo']}")
-        print(f"Protocolo: {resultado['protocolo']}")
-        print(f"Chave: {resultado['chave']}")
+        print(f"Status: {resultado.status}")
+        print(f"Motivo: {resultado.motivo}")
+        print(f"Protocolo: {resultado.protocolo}")
+        print(f"Chave: {resultado.chave}")
         print(f"XML salvo em: {arquivo}")
 
         set_ultimo_numero_nf(estado, cnpj, serie, numero_nf)
         salvar_estado(STATE_FILE, estado)
         print(f"Numero NF {numero_nf} serie {serie} salvo em {STATE_FILE}")
     else:
-        if resultado.get("xml_resposta"):
-            _salvar_log_xml(resultado["xml_resposta"], "emissao-erro", cnpj)
+        if resultado.xml_resposta:
+            _salvar_log_xml(resultado.xml_resposta, "emissao-erro", cnpj)
         print("ERRO na emissao:")
-        for erro in resultado.get("erros", []):
+        for erro in resultado.erros:
             print(f"  cStat={erro['status']}  {erro['motivo']}")
         sys.exit(1)
 

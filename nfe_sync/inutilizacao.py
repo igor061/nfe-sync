@@ -1,6 +1,7 @@
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
 from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring
+from .results import ResultadoInutilizacao
 
 
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
@@ -43,9 +44,9 @@ def inutilizar(
     resultados = extract_status_motivo(xml_resp, NS)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)
 
-    return {
-        "resultados": resultados,
-        "protocolo": protocolos[0].text if protocolos else None,
-        "xml": xml_resp_str,
-        "xml_resposta": xml_resp_str,
-    }
+    return ResultadoInutilizacao(
+        resultados=resultados,
+        protocolo=protocolos[0].text if protocolos else None,
+        xml=xml_resp_str,
+        xml_resposta=xml_resp_str,
+    )

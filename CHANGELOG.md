@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.59
+- refactor: #25 — dataclasses de retorno (ResultadoConsulta, ResultadoDistribuicao, etc.)
+
+## 0.2.58
+- refactor: #25 #26 #27 — dataclasses de retorno, DocumentoStorage e chamar_sefaz
+
 ## 0.2.57
 - fix: #20 — aceitar --producao/--homologacao antes ou depois do subcomando
 
