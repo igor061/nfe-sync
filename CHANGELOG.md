@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.64
+- fix: #36 — commands/consulta.py usa _storage.existe/remover, remove import os
+
 ## 0.2.63
 - fix: #37 — inutilizacao.py usa chamar_sefaz() em vez de criar_comunicacao direto
 
