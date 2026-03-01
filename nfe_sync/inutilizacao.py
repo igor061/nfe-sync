@@ -39,6 +39,7 @@ def inutilizar(
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)
 
     return ResultadoInutilizacao(
+        sucesso=any(r["status"] == "102" for r in resultados),
         resultados=resultados,
         protocolo=protocolos[0].text if protocolos else None,
         xml=xml_resp_str,

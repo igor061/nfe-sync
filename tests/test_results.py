@@ -174,15 +174,17 @@ class TestResultadoManifestacao:
 class TestResultadoInutilizacao:
     def test_campos(self):
         r = ResultadoInutilizacao(
+            sucesso=True,
             resultados=[{"status": "102", "motivo": "Inutilizacao homologada"}],
             protocolo="777",
             xml="<retInutNFe/>",
             xml_resposta="<retInutNFe/>",
         )
+        assert r.sucesso is True
         assert r.resultados[0]["status"] == "102"
         assert r.protocolo == "777"
 
     def test_frozen(self):
-        r = ResultadoInutilizacao(resultados=[], protocolo=None, xml="<x/>", xml_resposta="<x/>")
+        r = ResultadoInutilizacao(sucesso=False, resultados=[], protocolo=None, xml="<x/>", xml_resposta="<x/>")
         with pytest.raises(FrozenInstanceError):
             r.xml = "outro"
