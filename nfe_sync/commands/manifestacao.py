@@ -30,9 +30,11 @@ def cmd_manifestar(args):
 
 
 class ManifestacaoBlueprint(CliBlueprint):
-    def register(self, subparsers, parser) -> None:
+    def register(self, subparsers, parser, amb_parent=None) -> None:
+        parents = [amb_parent] if amb_parent else []
         p = subparsers.add_parser(
             "manifestar",
+            parents=parents,
             help=argparse.SUPPRESS,
             description="Registra a manifestacao do destinatario para uma NF-e na SEFAZ.",
             formatter_class=argparse.RawDescriptionHelpFormatter,

@@ -18,8 +18,10 @@ class CliBlueprint(ABC):
     """Base para todos os grupos de comandos CLI. Cada subclasse registra seus subcomandos."""
 
     @abstractmethod
-    def register(self, subparsers, parser) -> None:
-        """Registra os subcomandos no argparse. parser é o parser raiz."""
+    def register(self, subparsers, parser, amb_parent=None) -> None:
+        """Registra os subcomandos no argparse. parser é o parser raiz.
+        amb_parent, quando fornecido, deve ser passado como parents= nos
+        subparsers que aceitam --producao/--homologacao (issue #20)."""
         ...
 
 
