@@ -5,7 +5,7 @@ from pynfe.processamento.assinatura import AssinaturaA1
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
-from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
+from .xml_utils import extract_status_motivo, agora_brt, chamar_sefaz
 from .results import ResultadoManifestacao
 
 
@@ -67,11 +67,7 @@ def manifestar(
     assinatura = AssinaturaA1(empresa.certificado.path, empresa.certificado.senha)
     xml_assinado = assinatura.assinar(xml_evento)
 
-    con = criar_comunicacao(empresa)
-    resposta = con.evento(modelo="nfe", evento=xml_assinado)
-
-    xml_resp = safe_fromstring(resposta.content)
-    xml_resp_str = to_xml_string(xml_resp)
+    xml_resp, xml_resp_str = chamar_sefaz(empresa, "evento", modelo="nfe", evento=xml_assinado)
     resultados = extract_status_motivo(xml_resp, NS)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)
 

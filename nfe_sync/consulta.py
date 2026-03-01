@@ -1,11 +1,10 @@
 import logging
-import time
 import traceback
 from datetime import datetime, timedelta
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
-from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt, _com_retry, chamar_sefaz
 from .exceptions import NfeValidationError
 from .results import Documento, ResultadoConsulta, ResultadoDfeChave, ResultadoDistribuicao
 
@@ -50,18 +49,6 @@ def verificar_cooldown(bloqueado_ate: str | None) -> tuple[bool, str]:
 
 def calcular_proximo_cooldown(minutos: int = COOLDOWN_MINUTOS) -> str:
     return (_agora_brt() + timedelta(minutes=minutos)).isoformat(timespec="seconds")
-
-
-# Issue #5: retry com backoff exponencial
-def _com_retry(fn, *args, tentativas=3, base=5, **kwargs):
-    """Chama fn(*args, **kwargs) com retry exponencial (tentativas x, delay base*2^n segundos)."""
-    for n in range(tentativas):
-        try:
-            return fn(*args, **kwargs)
-        except Exception:
-            if n == tentativas - 1:
-                raise
-            time.sleep(base * (2 ** n))
 
 
 # Issue #7: salvar estado a cada N páginas
@@ -144,11 +131,8 @@ def consultar(empresa: EmpresaConfig, chave: str) -> ResultadoConsulta:
         )
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     uf = _uf_da_chave(chave) or empresa.uf
-    con = criar_comunicacao(empresa, uf=uf)
 
-    resp_sit = _com_retry(con.consulta_nota, modelo="nfe", chave=chave)
-    xml_sit = safe_fromstring(resp_sit.content)
-    xml_resposta = to_xml_string(xml_sit)
+    xml_sit, xml_resposta = chamar_sefaz(empresa, "consulta_nota", uf=uf, modelo="nfe", chave=chave)
     situacao = extract_status_motivo(xml_sit, NS)
 
     primeiro_stat = situacao[0]["status"] if situacao else ""
@@ -170,11 +154,8 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> ResultadoDfeChave
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj
     uf = _uf_da_chave(chave) or empresa.uf
-    con = criar_comunicacao(empresa, uf=uf)
 
-    resp = _com_retry(con.consulta_distribuicao, cnpj=cnpj, chave=chave)
-    xml_resp = safe_fromstring(resp.content if hasattr(resp, "content") else resp)
-    xml_resposta = to_xml_string(xml_resp)
+    xml_resp, xml_resposta = chamar_sefaz(empresa, "consulta_distribuicao", uf=uf, cnpj=cnpj, chave=chave)
 
     # escalares — não lista; manter inline
     status = xml_resp.xpath("//ns:cStat", namespaces=NS)

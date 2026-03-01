@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.61
+- refactor: #27 — extrair chamar_sefaz() e mover _com_retry para xml_utils
+
 ## 0.2.60
 - refactor: #26 — DocumentoStorage centraliza I/O de arquivos NF-e
 

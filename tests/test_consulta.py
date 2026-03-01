@@ -6,8 +6,9 @@ import pytest
 from nfe_sync.consulta import (
     verificar_cooldown, calcular_proximo_cooldown, consultar_nsu,
     consultar, consultar_dfe_chave,
-    _agora_brt, _com_retry, _SALVAR_A_CADA,
+    _agora_brt, _SALVAR_A_CADA,
 )
+from nfe_sync.xml_utils import _com_retry
 from nfe_sync.exceptions import NfeValidationError
 from nfe_sync.state import carregar_estado
 
@@ -170,21 +171,21 @@ class TestComRetry:
 
     def test_retry_apos_falha(self):
         fn = MagicMock(side_effect=[RuntimeError("falha"), "ok"])
-        with patch("nfe_sync.consulta.time.sleep") as mock_sleep:
+        with patch("nfe_sync.xml_utils.time.sleep") as mock_sleep:
             resultado = _com_retry(fn, tentativas=3, base=1)
         assert resultado == "ok"
         mock_sleep.assert_called_once_with(1)  # base * 2^0 = 1
 
     def test_levanta_na_ultima_tentativa(self):
         fn = MagicMock(side_effect=RuntimeError("sempre falha"))
-        with patch("nfe_sync.consulta.time.sleep"):
+        with patch("nfe_sync.xml_utils.time.sleep"):
             with pytest.raises(RuntimeError, match="sempre falha"):
                 _com_retry(fn, tentativas=3, base=1)
         assert fn.call_count == 3
 
     def test_backoff_exponencial(self):
         fn = MagicMock(side_effect=[RuntimeError(), RuntimeError(), "ok"])
-        with patch("nfe_sync.consulta.time.sleep") as mock_sleep:
+        with patch("nfe_sync.xml_utils.time.sleep") as mock_sleep:
             _com_retry(fn, tentativas=3, base=5)
         assert mock_sleep.call_args_list == [call(5), call(10)]  # 5*2^0, 5*2^1
 

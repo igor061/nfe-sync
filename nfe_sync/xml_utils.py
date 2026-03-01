@@ -1,3 +1,4 @@
+import time
 from datetime import datetime, timedelta, timezone
 
 from pynfe.processamento.comunicacao import ComunicacaoSefaz
@@ -41,6 +42,17 @@ def extract_status_motivo(xml_resp, ns: dict) -> list[dict]:
     return [{"status": s.text, "motivo": m.text} for s, m in zip(stats, motivos)]
 
 
+def _com_retry(fn, *args, tentativas=3, base=5, **kwargs):
+    """Chama fn(*args, **kwargs) com retry exponencial (tentativas x, delay base*2^n segundos)."""
+    for n in range(tentativas):
+        try:
+            return fn(*args, **kwargs)
+        except Exception:
+            if n == tentativas - 1:
+                raise
+            time.sleep(base * (2 ** n))
+
+
 _SEFAZ_TIMEOUT = 30  # segundos
 
 
@@ -64,3 +76,18 @@ def criar_comunicacao(empresa: EmpresaConfig, uf: str | None = None) -> Comunica
 
     con._post = _post_com_timeout
     return con
+
+
+def chamar_sefaz(empresa: EmpresaConfig, fn_nome: str, *args,
+                 uf: str | None = None, **kwargs):
+    """Executa fn_nome na ComunicacaoSefaz com retry e retorna (xml_element, xml_string).
+
+    fn_nome: nome do método de ComunicacaoSefaz (ex: 'consulta_nota', 'consulta_distribuicao').
+    Centraliza: criar_comunicacao → _com_retry → safe_fromstring → to_xml_string.
+    """
+    con = criar_comunicacao(empresa, uf=uf or empresa.uf)
+    fn = getattr(con, fn_nome)
+    resp = _com_retry(fn, *args, **kwargs)
+    content = resp.content if hasattr(resp, "content") else resp
+    xml_el = safe_fromstring(content)
+    return xml_el, to_xml_string(xml_el)
