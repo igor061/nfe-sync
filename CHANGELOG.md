@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.60
+- refactor: #26 — DocumentoStorage centraliza I/O de arquivos NF-e
+
 ## 0.2.59
 - refactor: #25 — dataclasses de retorno (ResultadoConsulta, ResultadoDistribuicao, etc.)
 
