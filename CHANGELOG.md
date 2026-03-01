@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.66
+- fix: #36 — aplicar storage I/O em commands/consulta.py (commit anterior omitiu os arquivos de código)
+
+## 0.2.65
+- fix: #37 — aplicar refatoração chamar_sefaz() (commit anterior omitiu os arquivos de código)
+
+## 0.2.64
+- fix: #36 — commands/consulta.py usa _storage.existe/remover, remove import os
+
+## 0.2.63
+- fix: #37 — inutilizacao.py usa chamar_sefaz() em vez de criar_comunicacao direto
+
+## 0.2.62
+- fix: #35 — corrigir type hints residuais -> dict em emitir() e inutilizar()
+
 ## 0.2.61
 - refactor: #27 — extrair chamar_sefaz() e mover _com_retry para xml_utils
 

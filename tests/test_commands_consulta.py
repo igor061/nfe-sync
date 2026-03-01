@@ -58,6 +58,30 @@ class TestProcessarESalvarDocs:
         captured = capsys.readouterr()
         assert "resumo" in captured.out
 
+    def test_substituiu_quando_procnfe_existente(self, capsys):
+        """Issue #36: usa _storage.existe() para detectar substituição de resumo."""
+        from nfe_sync.commands.consulta import _processar_e_salvar_docs
+
+        docs = [Documento(
+            nsu="001",
+            chave="12345678901234567890123456789012345678901234",
+            schema="procNFe_v4.00.xsd",
+            nome="12345678901234567890123456789012345678901234.xml",
+            xml="<procNFe/>",
+        )]
+
+        with patch("nfe_sync.commands.consulta._salvar_xml") as mock_salvar, \
+             patch("nfe_sync.commands.consulta._storage") as mock_storage:
+            mock_storage.existe.return_value = True
+            mock_salvar.return_value = "downloads/99999999000191/chave.xml"
+            completos = _processar_e_salvar_docs("99999999000191", docs)
+
+        mock_storage.existe.assert_called_once_with(
+            "99999999000191", "12345678901234567890123456789012345678901234.xml"
+        )
+        captured = capsys.readouterr()
+        assert "substituiu resumo" in captured.out
+
 
 class TestListarResumosPendentes:
     """Issue #9: deve detectar resNFe por root tag, sem filtrar por len(nome)."""
