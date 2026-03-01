@@ -2,6 +2,7 @@
 
 ## 0.2.68
 - fix: #40 — mensagem amigavel quando emitente sem endereco configurado
+- fix: #41 — exit code 1 quando SEFAZ rejeita inutilizacao
 
 ## 0.2.67
 - refactor: #28 — tipar CallbackProgresso e adicionar testes de contrato

@@ -62,6 +62,7 @@ class ResultadoManifestacao:
 
 @dataclass(frozen=True, slots=True)
 class ResultadoInutilizacao:
+    sucesso: bool  # True se algum cStat == "102"
     resultados: list  # list[dict]
     protocolo: str | None
     xml: str

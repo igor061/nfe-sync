@@ -1,5 +1,6 @@
 import argparse
 import os
+import sys
 
 from . import CliBlueprint, _carregar, _salvar_log_xml
 
@@ -30,6 +31,9 @@ def cmd_inutilizar(args):
     if resultado.protocolo:
         print(f"  Protocolo: {resultado.protocolo}")
     print(f"  Resposta salva em: {arquivo}")
+
+    if not resultado.sucesso:
+        sys.exit(1)
 
 
 class InutilizacaoBlueprint(CliBlueprint):
