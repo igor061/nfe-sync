@@ -1,14 +1,11 @@
-from datetime import datetime
-
 from pynfe.entidades.fonte_dados import FonteDados
 from pynfe.entidades.evento import EventoManifestacaoDest
 from pynfe.processamento.serializacao import SerializacaoXML
 from pynfe.processamento.assinatura import AssinaturaA1
-from pynfe.utils import etree
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
-from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
 
 
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
@@ -53,7 +50,7 @@ def manifestar(
         _fonte_dados=fonte,
         cnpj=cnpj,
         chave=chave,
-        data_emissao=datetime.now(),
+        data_emissao=agora_brt(),
         uf="AN",
         operacao=operacao_num,
         n_seq_evento=1,
@@ -72,7 +69,7 @@ def manifestar(
     con = criar_comunicacao(empresa)
     resposta = con.evento(modelo="nfe", evento=xml_assinado)
 
-    xml_resp = etree.fromstring(resposta.content)
+    xml_resp = safe_fromstring(resposta.content)
     xml_resp_str = to_xml_string(xml_resp)
     resultados = extract_status_motivo(xml_resp, NS)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)

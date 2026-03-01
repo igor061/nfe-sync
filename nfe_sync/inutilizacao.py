@@ -1,8 +1,6 @@
-from pynfe.utils import etree
-
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
-from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring
 
 
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
@@ -40,7 +38,7 @@ def inutilizar(
         serie=serie,
     )
 
-    xml_resp = etree.fromstring(resposta.content)
+    xml_resp = safe_fromstring(resposta.content)
     xml_resp_str = to_xml_string(xml_resp)
     resultados = extract_status_motivo(xml_resp, NS)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)

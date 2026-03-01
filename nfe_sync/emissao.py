@@ -1,4 +1,3 @@
-from datetime import datetime
 from decimal import Decimal
 
 from pynfe.entidades.fonte_dados import FonteDados
@@ -7,10 +6,9 @@ from pynfe.entidades.cliente import Cliente
 from pynfe.entidades.notafiscal import NotaFiscal
 from pynfe.processamento.serializacao import SerializacaoXML
 from pynfe.processamento.assinatura import AssinaturaA1
-from pynfe.utils import etree
 
 from .models import EmpresaConfig, DadosEmissao, validar_cnpj_sefaz
-from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
 
 
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
@@ -79,8 +77,8 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
         indicador_intermediador=dados.indicador_intermediador,
         transporte_modalidade_frete=dados.transporte_modalidade_frete,
         informacoes_complementares_interesse_contribuinte=dados.informacoes_complementares,
-        data_emissao=datetime.now(),
-        data_saida_entrada=datetime.now(),
+        data_emissao=agora_brt(),
+        data_saida_entrada=agora_brt(),
         municipio=end.cod_municipio,
     )
 
@@ -150,7 +148,7 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
             http_resp = resposta[1]
             xml_resposta = None
             try:
-                body = etree.fromstring(
+                body = safe_fromstring(
                     http_resp.content if hasattr(http_resp, "content") else http_resp
                 )
                 erros = extract_status_motivo(body, NS)

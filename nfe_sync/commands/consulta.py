@@ -159,22 +159,7 @@ def cmd_consultar_nsu(args):
     docs = resultado.get("documentos", [])
     if docs:
         print(f"Documentos: {len(docs)}")
-        for doc in docs:
-            if "erro" in doc:
-                print(f"  NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
-            else:
-                chave = doc.get("chave") or doc["nsu"]
-                schema = doc["schema"]
-                arquivo_existente = f"downloads/{cnpj}/{doc['nome']}"
-                substituiu_resumo = os.path.exists(arquivo_existente) and "procNFe" in schema
-                _salvar_xml(cnpj, doc["nome"], doc["xml"])
-                if "procNFe" in schema and substituiu_resumo:
-                    tipo = "XML completo (substituiu resumo)"
-                elif "procNFe" in schema:
-                    tipo = "XML completo"
-                else:
-                    tipo = "resumo"
-                print(f"  NSU {doc['nsu']} ({tipo}) chave={chave} — {arquivo_existente}")
+        _processar_e_salvar_docs(cnpj, docs)
 
     pendentes = _listar_resumos_pendentes(cnpj)
     if pendentes:

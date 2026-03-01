@@ -1,23 +1,20 @@
 import logging
 import time
 import traceback
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
-from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring
+from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
 
 
 COOLDOWN_MINUTOS = 61
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
 
-# Issue #14: timezone BRT (UTC-3) para timestamps consistentes
-_BRT = timezone(timedelta(hours=-3))
-
 
 def _agora_brt() -> datetime:
-    """Retorna o datetime atual no fuso BRT (UTC-3) sem informação de timezone."""
-    return datetime.now(_BRT).replace(tzinfo=None)
+    """Alias local para compatibilidade com testes existentes."""
+    return agora_brt()
 
 
 COD_UF = {

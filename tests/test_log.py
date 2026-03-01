@@ -8,7 +8,8 @@ from unittest.mock import patch
 import pytest
 
 import nfe_sync.log as log_module
-from nfe_sync.log import _limpar_logs_antigos, _agora_brt
+from nfe_sync.log import _limpar_logs_antigos
+from nfe_sync.xml_utils import agora_brt as _agora_brt
 
 
 class TestAgora:

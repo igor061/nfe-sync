@@ -43,12 +43,13 @@ class TestSafeFromstring:
 
 
 class TestCriarComunicacao:
-    """Issue #11: ComunicacaoSefaz nao expoe timeout — limitacao conhecida."""
+    """Issues #11/#19: timeout injetado via monkey-patch em _post."""
 
     def test_criar_comunicacao_usa_uf_empresa(self, empresa_sul):
         """criar_comunicacao usa a UF da empresa quando nao fornecida."""
-        from unittest.mock import patch
-        with patch("nfe_sync.xml_utils.ComunicacaoSefaz") as mock_cls:
+        from unittest.mock import patch, MagicMock
+        mock_con = MagicMock()
+        with patch("nfe_sync.xml_utils.ComunicacaoSefaz", return_value=mock_con) as mock_cls:
             criar_comunicacao(empresa_sul)
             mock_cls.assert_called_once_with(
                 empresa_sul.uf,
@@ -59,8 +60,9 @@ class TestCriarComunicacao:
 
     def test_criar_comunicacao_sobrescreve_uf(self, empresa_sul):
         """criar_comunicacao usa uf fornecida, ignorando empresa.uf."""
-        from unittest.mock import patch
-        with patch("nfe_sync.xml_utils.ComunicacaoSefaz") as mock_cls:
+        from unittest.mock import patch, MagicMock
+        mock_con = MagicMock()
+        with patch("nfe_sync.xml_utils.ComunicacaoSefaz", return_value=mock_con) as mock_cls:
             criar_comunicacao(empresa_sul, uf="sp")
             mock_cls.assert_called_once_with(
                 "sp",
@@ -68,3 +70,40 @@ class TestCriarComunicacao:
                 empresa_sul.certificado.senha,
                 empresa_sul.homologacao,
             )
+
+    def test_timeout_injetado_em_post(self, empresa_sul):
+        """Issue #19: _post deve receber timeout=30 quando nao fornecido."""
+        from unittest.mock import patch, MagicMock
+        mock_con = MagicMock()
+        original_post_chamadas = []
+
+        def fake_original_post(url, xml, timeout=None):
+            original_post_chamadas.append(timeout)
+            return MagicMock()
+
+        mock_con._post = fake_original_post
+
+        with patch("nfe_sync.xml_utils.ComunicacaoSefaz", return_value=mock_con):
+            con = criar_comunicacao(empresa_sul)
+
+        # Chamar _post sem timeout — deve usar o default de 30s
+        con._post("http://sefaz", "<xml/>")
+        assert original_post_chamadas == [30]
+
+    def test_timeout_explicito_tem_prioridade(self, empresa_sul):
+        """Timeout explícito passado pelo chamador deve ser respeitado."""
+        from unittest.mock import patch, MagicMock
+        mock_con = MagicMock()
+        chamadas = []
+
+        def fake_original_post(url, xml, timeout=None):
+            chamadas.append(timeout)
+            return MagicMock()
+
+        mock_con._post = fake_original_post
+
+        with patch("nfe_sync.xml_utils.ComunicacaoSefaz", return_value=mock_con):
+            con = criar_comunicacao(empresa_sul)
+
+        con._post("http://sefaz", "<xml/>", timeout=60)
+        assert chamadas == [60]

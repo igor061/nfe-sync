@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.53
+- fix: resolver issues #16-#19 — XXE em emissao/manifestacao/inutilizacao, timezone BRT compartilhado, timeout SEFAZ via monkey-patch, dedup cmd_consultar_nsu
+
 ## 0.2.52
 - fix: remover dependencia de packaging — usar ver_tuple interno
 
