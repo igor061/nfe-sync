@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.68
+- fix: #40 — mensagem amigavel quando emitente sem endereco configurado
+
 ## 0.2.67
 - refactor: #28 — tipar CallbackProgresso e adicionar testes de contrato
 
