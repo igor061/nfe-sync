@@ -3,6 +3,8 @@ import argparse
 import pytest
 from unittest.mock import patch, MagicMock
 
+from nfe_sync.results import ResultadoDistribuicao
+
 
 def _mock_empresas_hom():
     """Retorna empresa com homologacao=True (para testar override com --producao)."""
@@ -32,10 +34,10 @@ def _mock_empresas_prod():
     }
 
 
-_NSU_OK = {
-    "sucesso": True, "status": "137", "motivo": "OK",
-    "ultimo_nsu": 0, "max_nsu": 0, "documentos": [], "xmls_resposta": [], "estado": {},
-}
+_NSU_OK = ResultadoDistribuicao(
+    sucesso=True, status="137", motivo="OK",
+    ultimo_nsu=0, max_nsu=0, documentos=[], xmls_resposta=[], estado={},
+)
 
 
 class TestFlagsAmbientePos:

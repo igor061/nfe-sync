@@ -9,6 +9,7 @@ from pynfe.processamento.assinatura import AssinaturaA1
 
 from .models import EmpresaConfig, DadosEmissao, validar_cnpj_sefaz
 from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
+from .results import ResultadoEmissao
 
 
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
@@ -136,14 +137,16 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
             chave = nfe_proc.xpath("//ns:protNFe/ns:infProt/ns:chNFe", namespaces=NS)
             chave_txt = chave[0].text if chave else "nfe"
 
-            return {
-                "sucesso": True,
-                "status": status[0].text if status else None,
-                "motivo": motivo[0].text if motivo else None,
-                "protocolo": protocolo[0].text if protocolo else None,
-                "chave": chave_txt,
-                "xml": to_xml_string(nfe_proc),
-            }
+            return ResultadoEmissao(
+                sucesso=True,
+                status=status[0].text if status else None,
+                motivo=motivo[0].text if motivo else None,
+                protocolo=protocolo[0].text if protocolo else None,
+                chave=chave_txt,
+                xml=to_xml_string(nfe_proc),
+                xml_resposta=None,
+                erros=[],
+            )
         else:
             http_resp = resposta[1]
             xml_resposta = None
@@ -155,6 +158,14 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
                 xml_resposta = to_xml_string(body)
             except Exception:
                 erros = [{"status": str(codigo), "motivo": "Erro ao parsear resposta"}]
-            return {"sucesso": False, "codigo": codigo, "erros": erros, "xml_resposta": xml_resposta}
+            return ResultadoEmissao(
+                sucesso=False, status=None, motivo=None,
+                protocolo=None, chave=None, xml=None,
+                xml_resposta=xml_resposta, erros=erros,
+            )
     else:
-        return {"sucesso": False, "codigo": None, "resposta": str(resposta)}
+        return ResultadoEmissao(
+            sucesso=False, status=None, motivo=None,
+            protocolo=None, chave=None, xml=None,
+            xml_resposta=None, erros=[{"status": None, "motivo": str(resposta)}],
+        )

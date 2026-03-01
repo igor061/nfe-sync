@@ -6,6 +6,7 @@ from pynfe.processamento.assinatura import AssinaturaA1
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
 from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
+from .results import ResultadoManifestacao
 
 
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
@@ -23,7 +24,7 @@ def manifestar(
     operacao: str,
     chave: str,
     justificativa: str = "",
-) -> dict:
+) -> ResultadoManifestacao:
     if operacao not in OPERACOES:
         raise NfeValidationError(
             f"[{empresa.nome}] Operacao '{operacao}' invalida. "
@@ -74,10 +75,9 @@ def manifestar(
     resultados = extract_status_motivo(xml_resp, NS)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)
 
-    return {
-        "operacao": operacao_desc,
-        "resultados": resultados,
-        "protocolo": protocolos[0].text if protocolos else None,
-        "xml": xml_resp_str,
-        "xml_resposta": xml_resp_str,
-    }
+    return ResultadoManifestacao(
+        resultados=resultados,
+        protocolo=protocolos[0].text if protocolos else None,
+        xml=xml_resp_str,
+        xml_resposta=xml_resp_str,
+    )

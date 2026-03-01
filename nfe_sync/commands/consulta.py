@@ -41,14 +41,14 @@ def _processar_e_salvar_docs(cnpj: str, docs: list, prefixo: str = "") -> list[s
     """
     completos = []
     for doc in docs:
-        if "erro" in doc:
-            print(f"  {prefixo}NSU {doc['nsu']} ({doc['schema']}) — ERRO: {doc['erro']}")
+        if doc.erro is not None:
+            print(f"  {prefixo}NSU {doc.nsu} ({doc.schema}) — ERRO: {doc.erro}")
         else:
-            chave = doc.get("chave") or doc["nsu"]
-            schema = doc["schema"]
-            arquivo = f"downloads/{cnpj}/{doc['nome']}"
+            chave = doc.chave or doc.nsu
+            schema = doc.schema
+            arquivo = f"downloads/{cnpj}/{doc.nome}"
             substituiu = os.path.exists(arquivo) and "procNFe" in schema
-            _salvar_xml(cnpj, doc["nome"], doc["xml"])
+            _salvar_xml(cnpj, doc.nome, doc.xml)
             if "procNFe" in schema:
                 tipo = "XML completo (substituiu resumo)" if substituiu else "XML completo"
                 completos.append(chave)
@@ -70,16 +70,16 @@ def cmd_consultar(args):
 
     resultado = consultar(empresa, args.chave)
 
-    _salvar_log_xml(resultado["xml_resposta"], "consulta", args.chave)
+    _salvar_log_xml(resultado.xml_resposta, "consulta", args.chave)
 
-    for sit in resultado["situacao"]:
+    for sit in resultado.situacao:
         print(f"  cStat={sit['status']}  {sit['motivo']}")
 
-    if resultado["xml"]:
-        arquivo = _salvar_xml(cnpj, f"{args.chave}-situacao.xml", resultado["xml"])
+    if resultado.xml:
+        arquivo = _salvar_xml(cnpj, f"{args.chave}-situacao.xml", resultado.xml)
         print(f"  Protocolo salvo em: {arquivo}")
 
-    primeiro = resultado["situacao"][0]["status"] if resultado["situacao"] else ""
+    primeiro = resultado.situacao[0]["status"] if resultado.situacao else ""
     if not primeiro.startswith("1"):
         sys.exit(1)
 
@@ -90,17 +90,17 @@ def cmd_consultar(args):
         return
     print("Tentando baixar XML completo via distribuicao DFe...")
     dfe = consultar_dfe_chave(empresa, args.chave)
-    _salvar_log_xml(dfe["xml_resposta"], "dist-dfe-chave", args.chave)
-    print(f"  cStat={dfe.get('status')}  {dfe.get('motivo')}")
+    _salvar_log_xml(dfe.xml_resposta, "dist-dfe-chave", args.chave)
+    print(f"  cStat={dfe.status}  {dfe.motivo}")
 
-    if dfe.get("xml_cancelamento"):
-        arq_cancel = _salvar_xml(cnpj, f"{args.chave}-cancelamento.xml", dfe["xml_cancelamento"])
+    if dfe.xml_cancelamento:
+        arq_cancel = _salvar_xml(cnpj, f"{args.chave}-cancelamento.xml", dfe.xml_cancelamento)
         print(f"  Registro de cancelamento salvo em: {arq_cancel}")
         arq_cancelada = _tratar_arquivo_cancelado(cnpj, args.chave)
         if arq_cancelada:
             print(f"  NF-e renomeada para: {arq_cancelada}")
 
-    docs = dfe.get("documentos", [])
+    docs = dfe.documentos
     if docs:
         _processar_e_salvar_docs(cnpj, docs)
 
@@ -126,19 +126,19 @@ def cmd_consultar_nsu(args):
 
     if args.chave:
         resultado = consultar_dfe_chave(empresa, args.chave)
-        arq_resp = _salvar_log_xml(resultado["xml_resposta"], "dist-dfe-chave", args.chave)
-        print(f"Status: {resultado.get('status')}")
-        print(f"Motivo: {resultado.get('motivo')}")
+        arq_resp = _salvar_log_xml(resultado.xml_resposta, "dist-dfe-chave", args.chave)
+        print(f"Status: {resultado.status}")
+        print(f"Motivo: {resultado.motivo}")
         print(f"Resposta salva em: {arq_resp}")
 
-        if resultado.get("xml_cancelamento"):
-            arq_cancel = _salvar_xml(cnpj, f"{args.chave}-cancelamento.xml", resultado["xml_cancelamento"])
+        if resultado.xml_cancelamento:
+            arq_cancel = _salvar_xml(cnpj, f"{args.chave}-cancelamento.xml", resultado.xml_cancelamento)
             print(f"Registro de cancelamento salvo em: {arq_cancel}")
             arq_cancelada = _tratar_arquivo_cancelado(cnpj, args.chave)
             if arq_cancelada:
                 print(f"NF-e renomeada para: {arq_cancelada}")
 
-        docs = resultado.get("documentos", [])
+        docs = resultado.documentos
         if docs:
             print(f"Documentos: {len(docs)}")
             _processar_e_salvar_docs(cnpj, docs)
@@ -146,23 +146,23 @@ def cmd_consultar_nsu(args):
 
     resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu, callback=progresso)
 
-    if not resultado.get("sucesso") and "motivo" in resultado and not resultado.get("status"):
-        print(f"BLOQUEADO: {resultado['motivo']}")
+    if not resultado.sucesso and resultado.motivo and resultado.status is None:
+        print(f"BLOQUEADO: {resultado.motivo}")
         sys.exit(1)
 
-    if not resultado.get("sucesso"):
+    if not resultado.sucesso:
         sys.exit(1)
 
-    print(f"Status: {resultado.get('status')}")
-    print(f"Motivo: {resultado.get('motivo')}")
-    print(f"Ultimo NSU: {resultado.get('ultimo_nsu')}")
-    print(f"Max NSU: {resultado.get('max_nsu')}")
+    print(f"Status: {resultado.status}")
+    print(f"Motivo: {resultado.motivo}")
+    print(f"Ultimo NSU: {resultado.ultimo_nsu}")
+    print(f"Max NSU: {resultado.max_nsu}")
 
-    for i, xml_resp in enumerate(resultado.get("xmls_resposta", []), start=1):
+    for i, xml_resp in enumerate(resultado.xmls_resposta, start=1):
         arq = _salvar_log_xml(xml_resp, "dist-dfe", f"{cnpj}-p{i:03d}")
         print(f"Resposta salva em: {arq}")
 
-    docs = resultado.get("documentos", [])
+    docs = resultado.documentos
     if docs:
         print(f"Documentos: {len(docs)}")
         _processar_e_salvar_docs(cnpj, docs)
@@ -185,9 +185,9 @@ def cmd_consultar_nsu(args):
             for chave in pendentes:
                 try:
                     res = manifestar(empresa, "ciencia", chave, "")
-                    _salvar_log_xml(res["xml_resposta"], "manifestacao", f"{cnpj}-ciencia")
-                    _salvar_xml(cnpj, f"{chave}-evento-ciencia.xml", res["xml"])
-                    for r in res["resultados"]:
+                    _salvar_log_xml(res.xml_resposta, "manifestacao", f"{cnpj}-ciencia")
+                    _salvar_xml(cnpj, f"{chave}-evento-ciencia.xml", res.xml)
+                    for r in res.resultados:
                         print(f"  {chave[:8]}...  cStat={r['status']}  {r['motivo']}")
                         if r["status"] == "650":
                             canceladas.append(chave)
@@ -202,9 +202,9 @@ def cmd_consultar_nsu(args):
             print("Consultando novamente para baixar XML completo...")
             estado2 = carregar_estado(STATE_FILE)
             resultado2 = consultar_nsu(empresa, estado2, STATE_FILE, callback=progresso)
-            print(f"Status: {resultado2.get('status')}")
-            print(f"Motivo: {resultado2.get('motivo')}")
-            docs2 = resultado2.get("documentos", [])
+            print(f"Status: {resultado2.status}")
+            print(f"Motivo: {resultado2.motivo}")
+            docs2 = resultado2.documentos
             if docs2:
                 print(f"Documentos: {len(docs2)}")
                 completos = _processar_e_salvar_docs(cnpj, docs2, prefixo=f"NSU ... ")

@@ -18,17 +18,17 @@ def cmd_inutilizar(args):
     from ..inutilizacao import inutilizar
     resultado = inutilizar(empresa, args.serie, args.inicio, args.fim, args.justificativa)
 
-    _salvar_log_xml(resultado["xml_resposta"], "inutilizacao", f"{cnpj}-serie{args.serie}-{args.inicio}-{args.fim}")
+    _salvar_log_xml(resultado.xml_resposta, "inutilizacao", f"{cnpj}-serie{args.serie}-{args.inicio}-{args.fim}")
     os.makedirs("xml/inutilizacao", exist_ok=True)
     arquivo = f"xml/inutilizacao/inut-serie{args.serie}-{args.inicio}-{args.fim}.xml"
     with open(arquivo, "w") as f:
-        f.write(resultado["xml"])
+        f.write(resultado.xml)
 
     print("=== RESULTADO ===")
-    for r in resultado["resultados"]:
+    for r in resultado.resultados:
         print(f"  cStat={r['status']}  {r['motivo']}")
-    if resultado["protocolo"]:
-        print(f"  Protocolo: {resultado['protocolo']}")
+    if resultado.protocolo:
+        print(f"  Protocolo: {resultado.protocolo}")
     print(f"  Resposta salva em: {arquivo}")
 
 

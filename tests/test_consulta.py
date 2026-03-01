@@ -77,9 +77,9 @@ class TestConsultarNsu:
         state_file = str(tmp_path / "state.json")
 
         resultado = consultar_nsu(empresa_sul, estado, state_file)
-        assert resultado["sucesso"] is False
-        assert "bloqueada" in resultado["motivo"]
-        assert resultado["documentos"] == []
+        assert resultado.sucesso is False
+        assert "bloqueada" in resultado.motivo
+        assert resultado.documentos == []
 
     @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
     def test_nenhum_documento(self, mock_sefaz_cls, empresa_sul, tmp_path):
@@ -91,9 +91,9 @@ class TestConsultarNsu:
         estado = {}
 
         resultado = consultar_nsu(empresa_sul, estado, state_file)
-        assert resultado["sucesso"] is True
-        assert resultado["status"] == "137"
-        assert resultado["documentos"] == []
+        assert resultado.sucesso is True
+        assert resultado.status == "137"
+        assert resultado.documentos == []
 
     XML_COM_DOC_FINAL = b"""<?xml version="1.0" encoding="utf-8"?>
     <retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">
@@ -119,13 +119,13 @@ class TestConsultarNsu:
         estado = {}
 
         resultado = consultar_nsu(empresa_sul, estado, state_file)
-        assert resultado["sucesso"] is True
-        assert resultado["status"] == "138"
-        assert resultado["ultimo_nsu"] == 100
-        assert resultado["max_nsu"] == 100
-        assert len(resultado["documentos"]) == 2
-        assert resultado["documentos"][0]["nsu"] == "000000000000042"
-        assert resultado["documentos"][1]["nsu"] == "000000000000100"
+        assert resultado.sucesso is True
+        assert resultado.status == "138"
+        assert resultado.ultimo_nsu == 100
+        assert resultado.max_nsu == 100
+        assert len(resultado.documentos) == 2
+        assert resultado.documentos[0].nsu == "000000000000042"
+        assert resultado.documentos[1].nsu == "000000000000100"
 
         # verifica que salvou estado (sem cooldown quando baixou documentos com 138)
         estado_salvo = carregar_estado(state_file)
@@ -292,8 +292,8 @@ class TestProcessarDocsLogging:
             resultado = consultar_nsu(empresa_sul, {}, state_file)
 
         # O documento com erro deve estar na lista mas sem interromper
-        assert len(resultado["documentos"]) == 1
-        assert "erro" in resultado["documentos"][0]
+        assert len(resultado.documentos) == 1
+        assert resultado.documentos[0].erro is not None
         # O warning deve ter sido emitido
         assert any("000000000000001" in r.message for r in caplog.records)
 
@@ -326,7 +326,7 @@ class TestValidarChave:
             )
             mock_cls.return_value.consulta_nota.return_value = mock_resp
             resultado = consultar(empresa_sul, self.CHAVE_VALIDA)
-        assert resultado["situacao"] is not None
+        assert resultado.situacao is not None
 
     def test_consultar_dfe_chave_curta_levanta_erro(self, empresa_sul):
         with pytest.raises(NfeValidationError, match="44 digitos"):

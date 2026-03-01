@@ -4,6 +4,10 @@ import os
 import pytest
 from unittest.mock import patch, MagicMock
 
+from nfe_sync.results import (
+    Documento, ResultadoConsulta, ResultadoDfeChave, ResultadoDistribuicao,
+)
+
 
 class TestProcessarESalvarDocs:
     """Issue #8: helper _processar_e_salvar_docs elimina duplicação."""
@@ -11,13 +15,13 @@ class TestProcessarESalvarDocs:
     def test_imprime_e_salva_prochfe(self, tmp_path, capsys):
         from nfe_sync.commands.consulta import _processar_e_salvar_docs
 
-        docs = [{
-            "nsu": "001",
-            "chave": "12345678901234567890123456789012345678901234",
-            "schema": "procNFe_v4.00.xsd",
-            "nome": "12345678901234567890123456789012345678901234.xml",
-            "xml": "<procNFe/>",
-        }]
+        docs = [Documento(
+            nsu="001",
+            chave="12345678901234567890123456789012345678901234",
+            schema="procNFe_v4.00.xsd",
+            nome="12345678901234567890123456789012345678901234.xml",
+            xml="<procNFe/>",
+        )]
 
         with patch("nfe_sync.commands.consulta._salvar_xml") as mock_salvar:
             completos = _processar_e_salvar_docs("99999999000191", docs)
@@ -29,7 +33,7 @@ class TestProcessarESalvarDocs:
     def test_imprime_erro(self, capsys):
         from nfe_sync.commands.consulta import _processar_e_salvar_docs
 
-        docs = [{"nsu": "001", "schema": "resNFe_v1.01.xsd", "erro": "falha ao descompactar"}]
+        docs = [Documento(nsu="001", schema="resNFe_v1.01.xsd", erro="falha ao descompactar")]
         with patch("nfe_sync.commands.consulta._salvar_xml"):
             completos = _processar_e_salvar_docs("99999999000191", docs)
 
@@ -40,13 +44,13 @@ class TestProcessarESalvarDocs:
     def test_resumo_nao_adicionado_a_completos(self, capsys):
         from nfe_sync.commands.consulta import _processar_e_salvar_docs
 
-        docs = [{
-            "nsu": "001",
-            "chave": "12345678901234567890123456789012345678901234",
-            "schema": "resNFe_v1.01.xsd",
-            "nome": "12345678901234567890123456789012345678901234.xml",
-            "xml": "<resNFe/>",
-        }]
+        docs = [Documento(
+            nsu="001",
+            chave="12345678901234567890123456789012345678901234",
+            schema="resNFe_v1.01.xsd",
+            nome="12345678901234567890123456789012345678901234.xml",
+            xml="<resNFe/>",
+        )]
         with patch("nfe_sync.commands.consulta._salvar_xml"):
             completos = _processar_e_salvar_docs("99999999000191", docs)
 
@@ -156,11 +160,11 @@ class TestCmdConsultarExitCode:
         """cStat=215 (rejeição) → exit code 1."""
         mock_carregar.return_value = (self._make_mock_empresa(), {})
         mock_log.return_value = "log/x.xml"
-        mock_consultar.return_value = {
-            "situacao": [{"status": "215", "motivo": "Rejeicao: CNPJ invalido"}],
-            "xml": None,
-            "xml_resposta": "<resp/>",
-        }
+        mock_consultar.return_value = ResultadoConsulta(
+            situacao=[{"status": "215", "motivo": "Rejeicao: CNPJ invalido"}],
+            xml=None,
+            xml_resposta="<resp/>",
+        )
 
         from nfe_sync.commands.consulta import cmd_consultar
         with pytest.raises(SystemExit) as exc:
@@ -175,18 +179,19 @@ class TestCmdConsultarExitCode:
         """cStat=100 (autorizado) → sem SystemExit."""
         mock_carregar.return_value = (self._make_mock_empresa(), {})
         mock_log.return_value = "log/x.xml"
-        mock_consultar.return_value = {
-            "situacao": [{"status": "100", "motivo": "Autorizado o uso da NF-e"}],
-            "xml": "<procNFe/>",
-            "xml_resposta": "<resp/>",
-        }
-        mock_dfe.return_value = {
-            "status": "138",
-            "motivo": "Documento localizado",
-            "xml_cancelamento": None,
-            "documentos": [],
-            "xml_resposta": "<resp/>",
-        }
+        mock_consultar.return_value = ResultadoConsulta(
+            situacao=[{"status": "100", "motivo": "Autorizado o uso da NF-e"}],
+            xml="<procNFe/>",
+            xml_resposta="<resp/>",
+        )
+        mock_dfe.return_value = ResultadoDfeChave(
+            sucesso=True,
+            status="138",
+            motivo="Documento localizado",
+            xml_cancelamento=None,
+            documentos=[],
+            xml_resposta="<resp/>",
+        )
 
         with patch("nfe_sync.commands.consulta._salvar_xml"):
             from nfe_sync.commands.consulta import cmd_consultar
@@ -199,16 +204,16 @@ class TestCmdConsultarExitCode:
         """consultar_nsu com status 589 (erro) → exit code 1."""
         mock_carregar.return_value = (self._make_mock_empresa(), {})
         mock_log.return_value = "log/x.xml"
-        mock_nsu.return_value = {
-            "sucesso": False,
-            "status": "589",
-            "motivo": "Rejeicao: acesso negado",
-            "ultimo_nsu": 0,
-            "max_nsu": 0,
-            "documentos": [],
-            "xmls_resposta": ["<resp/>"],
-            "estado": {},
-        }
+        mock_nsu.return_value = ResultadoDistribuicao(
+            sucesso=False,
+            status="589",
+            motivo="Rejeicao: acesso negado",
+            ultimo_nsu=0,
+            max_nsu=0,
+            documentos=[],
+            xmls_resposta=["<resp/>"],
+            estado={},
+        )
 
         args = MagicMock()
         args.empresa = "SUL"
@@ -230,16 +235,16 @@ class TestCmdConsultarExitCode:
         """consultar_nsu com status 137 (sem docs) → sem SystemExit."""
         mock_carregar.return_value = (self._make_mock_empresa(), {})
         mock_log.return_value = "log/x.xml"
-        mock_nsu.return_value = {
-            "sucesso": True,
-            "status": "137",
-            "motivo": "Nenhum documento localizado",
-            "ultimo_nsu": 0,
-            "max_nsu": 0,
-            "documentos": [],
-            "xmls_resposta": ["<resp/>"],
-            "estado": {},
-        }
+        mock_nsu.return_value = ResultadoDistribuicao(
+            sucesso=True,
+            status="137",
+            motivo="Nenhum documento localizado",
+            ultimo_nsu=0,
+            max_nsu=0,
+            documentos=[],
+            xmls_resposta=["<resp/>"],
+            estado={},
+        )
 
         args = MagicMock()
         args.empresa = "SUL"

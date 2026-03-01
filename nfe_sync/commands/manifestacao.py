@@ -18,14 +18,14 @@ def cmd_manifestar(args):
     from ..manifestacao import manifestar
     resultado = manifestar(empresa, args.operacao, args.chave, args.justificativa)
 
-    _salvar_log_xml(resultado["xml_resposta"], "manifestacao", f"{cnpj}-{args.operacao}")
-    arquivo = _salvar_xml(cnpj, f"{args.chave}-evento-{args.operacao}.xml", resultado["xml"])
+    _salvar_log_xml(resultado.xml_resposta, "manifestacao", f"{cnpj}-{args.operacao}")
+    arquivo = _salvar_xml(cnpj, f"{args.chave}-evento-{args.operacao}.xml", resultado.xml)
 
     print("=== RESULTADO ===")
-    for r in resultado["resultados"]:
+    for r in resultado.resultados:
         print(f"  cStat={r['status']}  {r['motivo']}")
-    if resultado["protocolo"]:
-        print(f"  Protocolo: {resultado['protocolo']}")
+    if resultado.protocolo:
+        print(f"  Protocolo: {resultado.protocolo}")
     print(f"  Resposta salva em: {arquivo}")
 
 

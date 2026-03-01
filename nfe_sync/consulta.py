@@ -7,6 +7,7 @@ from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
 from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
 from .exceptions import NfeValidationError
+from .results import Documento, ResultadoConsulta, ResultadoDfeChave, ResultadoDistribuicao
 
 
 COOLDOWN_MINUTOS = 61
@@ -104,7 +105,7 @@ def nome_arquivo_nsu(xml_doc, schema: str, fallback: str) -> tuple[str, str | No
     return nome, None
 
 
-def _processar_docs(xml_resp) -> list[dict]:
+def _processar_docs(xml_resp) -> list[Documento]:
     from pynfe.utils.descompactar import DescompactaGzip
     docs_xml = xml_resp.xpath("//ns:docZip", namespaces=NS)
     documentos = []
@@ -115,28 +116,28 @@ def _processar_docs(xml_resp) -> list[dict]:
         try:
             xml_doc = DescompactaGzip.descompacta(doc.text)
             nome, chave = nome_arquivo_nsu(xml_doc, schema, doc_nsu)
-            documentos.append({
-                "nsu": doc_nsu,
-                "chave": chave,
-                "schema": schema,
-                "nome": f"{nome}.xml",
-                "xml": to_xml_string(xml_doc),
-            })
+            documentos.append(Documento(
+                nsu=doc_nsu,
+                chave=chave,
+                schema=schema,
+                nome=f"{nome}.xml",
+                xml=to_xml_string(xml_doc),
+            ))
         except Exception as e:
             # Issue #1: logar traceback completo para diagnóstico
             logging.warning(
                 "NSU %s: erro ao processar documento\n%s", doc_nsu, traceback.format_exc()
             )
-            documentos.append({
-                "nsu": doc_nsu,
-                "schema": schema,
-                "erro": str(e),
-            })
+            documentos.append(Documento(
+                nsu=doc_nsu,
+                schema=schema,
+                erro=str(e),
+            ))
 
     return documentos
 
 
-def consultar(empresa: EmpresaConfig, chave: str) -> dict:
+def consultar(empresa: EmpresaConfig, chave: str) -> ResultadoConsulta:
     if len(chave) != 44 or not chave.isdigit():
         raise NfeValidationError(
             f"[{empresa.nome}] Chave de acesso deve ter 44 digitos numericos, recebeu: '{chave}'"
@@ -153,14 +154,14 @@ def consultar(empresa: EmpresaConfig, chave: str) -> dict:
     primeiro_stat = situacao[0]["status"] if situacao else ""
     xml = xml_resposta if primeiro_stat.startswith("1") else None
 
-    return {
-        "situacao": situacao,
-        "xml": xml,
-        "xml_resposta": xml_resposta,
-    }
+    return ResultadoConsulta(
+        situacao=situacao,
+        xml=xml,
+        xml_resposta=xml_resposta,
+    )
 
 
-def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
+def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> ResultadoDfeChave:
     """Baixa o documento DFe (procNFe) diretamente pela chave de acesso."""
     if len(chave) != 44 or not chave.isdigit():
         raise NfeValidationError(
@@ -189,27 +190,31 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> dict:
     elif c_stat == "653":
         xml_cancelamento = xml_resposta
 
-    return {
-        "sucesso": c_stat == "138",
-        "status": c_stat,
-        "motivo": x_motivo,
-        "documentos": documentos,
-        "xml_resposta": xml_resposta,
-        "xml_cancelamento": xml_cancelamento,
-    }
+    return ResultadoDfeChave(
+        sucesso=c_stat == "138",
+        status=c_stat,
+        motivo=x_motivo,
+        documentos=documentos,
+        xml_resposta=xml_resposta,
+        xml_cancelamento=xml_cancelamento,
+    )
 
 
 def consultar_nsu(
     empresa: EmpresaConfig, estado: dict, state_file: str | None = None,
     nsu: int | None = None, callback=None,
-) -> dict:
+) -> ResultadoDistribuicao:
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj
     ambiente = "homologacao" if empresa.homologacao else "producao"
 
     bloqueado, msg = verificar_cooldown(get_cooldown(estado, cnpj, ambiente))
     if bloqueado:
-        return {"sucesso": False, "motivo": msg, "documentos": [], "estado": estado, "xmls_resposta": []}
+        return ResultadoDistribuicao(
+            sucesso=False, status=None, motivo=msg,
+            ultimo_nsu=0, max_nsu=0,
+            documentos=[], xmls_resposta=[], estado=estado,
+        )
 
     if nsu is None:
         nsu = get_ultimo_nsu(estado, cnpj)
@@ -266,13 +271,13 @@ def consultar_nsu(
         if state_file:
             salvar_estado(state_file, estado)
 
-    return {
-        "sucesso": c_stat in ("137", "138"),
-        "status": c_stat,
-        "motivo": x_motivo,
-        "ultimo_nsu": ult_nsu,
-        "max_nsu": max_nsu,
-        "documentos": documentos,
-        "xmls_resposta": xmls_resposta,
-        "estado": estado,
-    }
+    return ResultadoDistribuicao(
+        sucesso=c_stat in ("137", "138"),
+        status=c_stat,
+        motivo=x_motivo,
+        ultimo_nsu=ult_nsu,
+        max_nsu=max_nsu,
+        documentos=documentos,
+        xmls_resposta=xmls_resposta,
+        estado=estado,
+    )
