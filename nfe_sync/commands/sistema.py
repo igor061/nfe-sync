@@ -5,8 +5,6 @@ import sys
 import urllib.request
 from importlib.metadata import version, PackageNotFoundError
 
-from packaging.version import Version
-
 from . import CliBlueprint
 
 GITHUB_RAW = "https://raw.githubusercontent.com/igor061/nfe-sync/main/pyproject.toml"
@@ -32,6 +30,11 @@ def _versao_remota() -> str | None:
         return None
 
 
+def _ver_tuple(v: str) -> tuple:
+    m = re.match(r"(\d+)\.(\d+)\.(\d+)", v)
+    return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+
+
 def _changelog_novidades(versao_local: str) -> list[str]:
     try:
         with urllib.request.urlopen(GITHUB_CHANGELOG, timeout=5) as r:
@@ -40,8 +43,7 @@ def _changelog_novidades(versao_local: str) -> list[str]:
         padrao_versao = re.compile(r"^## (\d+\.\d+\.\d+)")
 
         def ver_tuple(v):
-            m = re.match(r"(\d+)\.(\d+)\.(\d+)", v)
-            return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+            return _ver_tuple(v)
 
         local_t = ver_tuple(versao_local)
         linhas = []
@@ -68,7 +70,7 @@ def cmd_versao(args):
     remota = _versao_remota()
     if remota is None:
         print("Nao foi possivel verificar a versao remota.")
-    elif Version(remota) <= Version(local):
+    elif _ver_tuple(remota) <= _ver_tuple(local):
         print(f"Voce esta na versao mais recente ({local}).")
     else:
         print(f"Nova versao disponivel: {remota}")
@@ -96,7 +98,7 @@ def cmd_atualizar(args):
     if remota is None:
         print("Nao foi possivel verificar a versao remota.")
         sys.exit(1)
-    if Version(remota) <= Version(local):
+    if _ver_tuple(remota) <= _ver_tuple(local):
         print(f"Voce ja esta na versao mais recente ({local}).")
         return
     print(f"Atualizando {local} -> {remota}...")

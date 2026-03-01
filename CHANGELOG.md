@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.52
+- fix: remover dependencia de packaging — usar ver_tuple interno
+
 ## 0.2.51
 - fix: resolver issues #1-#15 — seguranca, validacao, resiliencia e logging
 
