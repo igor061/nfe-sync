@@ -1,6 +1,7 @@
 import logging
 import traceback
 from datetime import datetime, timedelta
+from typing import Callable
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
@@ -11,6 +12,10 @@ from .results import Documento, ResultadoConsulta, ResultadoDfeChave, ResultadoD
 
 COOLDOWN_MINUTOS = 61
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
+
+# Assinatura do callback de progresso de consultar_nsu:
+# (pagina, total_docs_acumulados, ultimo_nsu, max_nsu) -> None
+CallbackProgresso = Callable[[int, int, int, int], None]
 
 
 def _agora_brt() -> datetime:
@@ -183,7 +188,7 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> ResultadoDfeChave
 
 def consultar_nsu(
     empresa: EmpresaConfig, estado: dict, state_file: str | None = None,
-    nsu: int | None = None, callback=None,
+    nsu: int | None = None, callback: CallbackProgresso | None = None,
 ) -> ResultadoDistribuicao:
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     cnpj = empresa.emitente.cnpj

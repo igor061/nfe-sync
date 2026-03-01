@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.67
+- refactor: #28 — tipar CallbackProgresso e adicionar testes de contrato
+
 ## 0.2.66
 - fix: #36 — aplicar storage I/O em commands/consulta.py (commit anterior omitiu os arquivos de código)
 
