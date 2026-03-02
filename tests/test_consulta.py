@@ -134,8 +134,9 @@ class TestConsultarNsu:
 
         # verifica que salvou estado (sem cooldown quando baixou documentos com 138)
         estado_salvo = carregar_estado(state_file)
-        assert estado_salvo["nsu"][empresa_sul.emitente.cnpj] == 100
-        assert f"{empresa_sul.emitente.cnpj}:homologacao" not in estado_salvo.get("cooldown", {})
+        cnpj = empresa_sul.emitente.cnpj
+        assert estado_salvo["nsu"][f"{cnpj}:homologacao"] == 100  # Issue #57: chave inclui ambiente
+        assert f"{cnpj}:homologacao" not in estado_salvo.get("cooldown", {})
 
     @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
     def test_usa_ultimo_nsu_do_estado(self, mock_sefaz_cls, empresa_sul, tmp_path):

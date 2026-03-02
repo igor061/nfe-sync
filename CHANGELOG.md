@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.72
+- fix: #57 — NSU e numeracao NF separados por ambiente no state.json
+
 ## 0.2.71
 - fix: #53 — agora_brt() preserva tzinfo BRT; corrige comparacoes naive/aware
 - fix: #54 — normalizar complemento no _salvar_ini e truncar a 60 chars no emitir

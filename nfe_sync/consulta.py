@@ -207,7 +207,7 @@ def consultar_nsu(
         )
 
     if nsu is None:
-        nsu = get_ultimo_nsu(estado, cnpj)
+        nsu = get_ultimo_nsu(estado, cnpj, ambiente)
 
     con = criar_comunicacao(empresa)
 
@@ -244,7 +244,7 @@ def consultar_nsu(
         docs = _processar_docs(xml_resp)
         documentos.extend(docs)
 
-        set_ultimo_nsu(estado, cnpj, ult_nsu)
+        set_ultimo_nsu(estado, cnpj, ult_nsu, ambiente)
         # Issue #7: salvar estado a cada _SALVAR_A_CADA páginas ou na última
         if pagina % _SALVAR_A_CADA == 0 or ult_nsu >= max_nsu:
             if state_file:

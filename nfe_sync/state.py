@@ -26,13 +26,14 @@ def salvar_estado(state_file: str, estado: dict) -> None:
             fcntl.flock(f, fcntl.LOCK_UN)
 
 
-def get_ultimo_numero_nf(estado: dict, cnpj: str, serie: str) -> int:
-    chave = f"{cnpj}:{serie}"
-    return estado.get("numeracao", {}).get(chave, 0)
+def get_ultimo_numero_nf(estado: dict, cnpj: str, serie: str, ambiente: str = "producao") -> int:
+    num = estado.get("numeracao", {})
+    # Tenta chave nova (cnpj:serie:ambiente), fallback para chave legada (cnpj:serie)
+    return num.get(f"{cnpj}:{serie}:{ambiente}", num.get(f"{cnpj}:{serie}", 0))
 
 
-def set_ultimo_numero_nf(estado: dict, cnpj: str, serie: str, numero: int) -> None:
-    estado.setdefault("numeracao", {})[f"{cnpj}:{serie}"] = numero
+def set_ultimo_numero_nf(estado: dict, cnpj: str, serie: str, numero: int, ambiente: str = "producao") -> None:
+    estado.setdefault("numeracao", {})[f"{cnpj}:{serie}:{ambiente}"] = numero
 
 
 def _chave_cooldown(cnpj: str, ambiente: str) -> str:
@@ -52,9 +53,11 @@ def limpar_cooldown(estado: dict, cnpj: str, ambiente: str = "homologacao") -> N
     cooldowns.pop(_chave_cooldown(cnpj, ambiente), None)
 
 
-def get_ultimo_nsu(estado: dict, cnpj: str) -> int:
-    return estado.get("nsu", {}).get(cnpj, 0)
+def get_ultimo_nsu(estado: dict, cnpj: str, ambiente: str = "producao") -> int:
+    nsu_dict = estado.get("nsu", {})
+    # Tenta chave nova (cnpj:ambiente), fallback para chave legada (cnpj)
+    return nsu_dict.get(f"{cnpj}:{ambiente}", nsu_dict.get(cnpj, 0))
 
 
-def set_ultimo_nsu(estado: dict, cnpj: str, nsu: int) -> None:
-    estado.setdefault("nsu", {})[cnpj] = nsu
+def set_ultimo_nsu(estado: dict, cnpj: str, nsu: int, ambiente: str = "producao") -> None:
+    estado.setdefault("nsu", {})[f"{cnpj}:{ambiente}"] = nsu
