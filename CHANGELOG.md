@@ -2,6 +2,7 @@
 
 ## 0.2.69
 - fix: #44 — config.py carrega campos de endereco do INI
+- fix: #46 — cnpjws extrai cod_municipio do ibge_id e salva no INI
 
 ## 0.2.68
 - fix: #40 — mensagem amigavel quando emitente sem endereco configurado
