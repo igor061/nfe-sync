@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.90
+- feat: adicionar consultar-nsu com state file isolado em TestFluxoCompleto (etapas 7 e 8)
+
 ## 0.2.89
 - fix: remover consultar-nsu de TestFluxoCompleto — nao faz parte do fluxo de NF-e
 
