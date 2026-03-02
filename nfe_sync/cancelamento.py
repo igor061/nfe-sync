@@ -36,9 +36,9 @@ def cancelar(
     )
 
     xml_evento = SerializacaoXML(fonte, homologacao=empresa.homologacao).serializar_evento(evento)
-    xml_assinado = AssinaturaA1(empresa.certificado.path, empresa.certificado.senha).assinar(xml_evento)
-
-    xml_resp, xml_resp_str = chamar_sefaz(empresa, "evento", modelo="nfe", evento=xml_assinado)
+    with empresa.certificado.cert_path() as cert_path:
+        xml_assinado = AssinaturaA1(cert_path, empresa.certificado.senha).assinar(xml_evento)
+        xml_resp, xml_resp_str = chamar_sefaz(empresa, "evento", modelo="nfe", evento=xml_assinado, cert_path=cert_path)
     resultados = extract_status_motivo(xml_resp, NS)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)
 

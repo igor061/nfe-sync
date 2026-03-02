@@ -69,16 +69,19 @@ def _com_retry(fn, *args, tentativas=3, base=5, **kwargs):
 _SEFAZ_TIMEOUT = 30  # segundos
 
 
-def criar_comunicacao(empresa: EmpresaConfig, uf: str | None = None) -> ComunicacaoSefaz:
+def criar_comunicacao(empresa: EmpresaConfig, uf: str | None = None, cert_path: str | None = None) -> ComunicacaoSefaz:
     """Factory para ComunicacaoSefaz com timeout de 30s injetado via monkey-patch em _post.
 
     pynfe nao expoe timeout nos metodos publicos (exceto autorizacao/status_servico),
     mas _post() ja aceita o parametro — envolvemos para garantir timeout em todas as chamadas.
     Issue #11 / #19.
+
+    cert_path: path do certificado a usar. Se None, usa empresa.certificado.path.
+    Deve ser o path já resolvido pelo context manager Certificado.cert_path().
     """
     con = ComunicacaoSefaz(
         uf if uf is not None else empresa.uf,
-        empresa.certificado.path,
+        cert_path if cert_path is not None else empresa.certificado.path,
         empresa.certificado.senha,
         empresa.homologacao,
     )
@@ -92,13 +95,15 @@ def criar_comunicacao(empresa: EmpresaConfig, uf: str | None = None) -> Comunica
 
 
 def chamar_sefaz(empresa: EmpresaConfig, fn_nome: str, *args,
-                 uf: str | None = None, **kwargs):
+                 uf: str | None = None, cert_path: str | None = None, **kwargs):
     """Executa fn_nome na ComunicacaoSefaz com retry e retorna (xml_element, xml_string).
 
     fn_nome: nome do método de ComunicacaoSefaz (ex: 'consulta_nota', 'consulta_distribuicao').
     Centraliza: criar_comunicacao → _com_retry → safe_fromstring → to_xml_string.
+
+    cert_path: path já resolvido pelo context manager Certificado.cert_path().
     """
-    con = criar_comunicacao(empresa, uf=uf or empresa.uf)
+    con = criar_comunicacao(empresa, uf=uf or empresa.uf, cert_path=cert_path)
     fn = getattr(con, fn_nome)
     resp = _com_retry(fn, *args, **kwargs)
     content = resp.content if hasattr(resp, "content") else resp

@@ -126,11 +126,11 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
     serializar = SerializacaoXML(fonte, homologacao=empresa.homologacao)
     xml = serializar.exportar(limpar=False)
 
-    assinatura = AssinaturaA1(empresa.certificado.path, empresa.certificado.senha)
-    xml_assinado = assinatura.assinar(xml)
-
-    con = criar_comunicacao(empresa)
-    resposta = con.autorizacao(modelo="nfe", nota_fiscal=xml_assinado)
+    with empresa.certificado.cert_path() as cert_path:
+        assinatura = AssinaturaA1(cert_path, empresa.certificado.senha)
+        xml_assinado = assinatura.assinar(xml)
+        con = criar_comunicacao(empresa, cert_path=cert_path)
+        resposta = con.autorizacao(modelo="nfe", nota_fiscal=xml_assinado)
 
     if isinstance(resposta, tuple):
         codigo = resposta[0]
