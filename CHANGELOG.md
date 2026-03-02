@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.86
+- feat: #85 — teste E2E fluxo completo emissao-consulta-manifestacao-cancelamento
+
 ## 0.2.85
 - fix: #82 — registrar cooldown para cStat=656 (Consumo Indevido)
 
