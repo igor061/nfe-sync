@@ -11,6 +11,7 @@ class CnpjwsEndereco(BaseModel, extra="allow"):
     complemento: str = ""
     bairro: str = ""
     municipio: str = ""
+    cod_municipio: str = ""
     uf: str = ""
     cep: str = ""
 
@@ -35,7 +36,9 @@ class CnpjwsEmpresa(BaseModel, extra="allow"):
     @classmethod
     def from_api(cls, dados: dict) -> "CnpjwsEmpresa":
         est = dados.get("estabelecimento", {})
-        municipio = est.get("cidade", {}).get("nome", "") if isinstance(est.get("cidade"), dict) else est.get("municipio", "")
+        cidade = est.get("cidade", {}) if isinstance(est.get("cidade"), dict) else {}
+        municipio = cidade.get("nome", "") or est.get("municipio", "")
+        cod_municipio = str(cidade.get("ibge_id", "")) if cidade.get("ibge_id") else ""
         estado = est.get("estado", {}).get("sigla", "") if isinstance(est.get("estado"), dict) else est.get("uf", "")
         endereco = CnpjwsEndereco(
             logradouro=f"{est.get('tipo_logradouro', '')} {est.get('logradouro', '')}".strip(),
@@ -43,6 +46,7 @@ class CnpjwsEmpresa(BaseModel, extra="allow"):
             complemento=est.get("complemento", ""),
             bairro=est.get("bairro", ""),
             municipio=municipio,
+            cod_municipio=cod_municipio,
             uf=estado,
             cep=est.get("cep", ""),
         )

@@ -70,7 +70,7 @@ def _salvar_ini(empresa, nome_secao: str):
     cfg.set(nome_secao, "complemento", end.complemento or "")
     cfg.set(nome_secao, "bairro", end.bairro)
     cfg.set(nome_secao, "municipio", end.municipio)
-    cfg.set(nome_secao, "cod_municipio", "")
+    cfg.set(nome_secao, "cod_municipio", end.cod_municipio)
     cfg.set(nome_secao, "endereco_uf", end.uf.upper())
     cfg.set(nome_secao, "cep", str(end.cep))
 
