@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.87
+- fix: #88 #89 #90 — remover fail redundante, acoplar nsu_emitente ao fluxo, precisar asserts cStat
+
 ## 0.2.86
 - feat: #85 — teste E2E fluxo completo emissao-consulta-manifestacao-cancelamento
 
