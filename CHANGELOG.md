@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.81
+- fix: usar pynfe.utils.etree no E2E de cancelamento (lxml nao e dependencia direta)
+
 ## 0.2.80
 - feat: cancelamento de NF-e via SEFAZ (EventoCancelarNota)
 
