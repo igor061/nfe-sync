@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.76
+- fix: #63 — reduzir timeout padrao de run_nfe para 30s
+
 ## 0.2.75
 - fix: #62 #63 — corrigir comentario cStat 137/138 e adicionar timeout=120 em run_nfe
 
