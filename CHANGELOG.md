@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.77
+- fix: #64 #65 #66 — homologacao forcado em run_nfe, marker slow via pytest_configure, fixture nf_emitida session-scoped
+
 ## 0.2.76
 - fix: #63 — reduzir timeout padrao de run_nfe para 30s
 
