@@ -10,7 +10,7 @@ Executar com:
 import os
 import re
 import pytest
-from lxml import etree
+from pynfe.utils import etree
 from .conftest import run_nfe
 
 
