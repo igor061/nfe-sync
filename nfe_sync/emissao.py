@@ -8,6 +8,7 @@ from pynfe.processamento.serializacao import SerializacaoXML
 from pynfe.processamento.assinatura import AssinaturaA1
 
 from .models import EmpresaConfig, DadosEmissao, validar_cnpj_sefaz
+from .exceptions import NfeValidationError
 from .xml_utils import to_xml_string, extract_status_motivo, criar_comunicacao, safe_fromstring, agora_brt
 from .results import ResultadoEmissao
 
@@ -17,9 +18,13 @@ NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
 
 def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmissao) -> ResultadoEmissao:
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
-    fonte = FonteDados()
     emi = empresa.emitente
     end = emi.endereco
+    if end is None:
+        raise NfeValidationError(
+            f"[{empresa.nome}] Emitente sem endereco configurado."
+        )
+    fonte = FonteDados()
 
     emitente = PynfeEmitente(
         _fonte_dados=fonte,
