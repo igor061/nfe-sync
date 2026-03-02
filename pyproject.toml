@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nfe-sync"
-version = "0.2.72"
+version = "0.2.76"
 requires-python = ">=3.12"
 dependencies = ["pynfe>=0.6.5", "python-dotenv", "pydantic>=2.0", "requests", "signxml"]
 
@@ -18,3 +18,9 @@ api_cli = "nfe_sync.apis.cli:cli"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["nfe_sync", "nfe_sync.*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "slow: testes que chamam a SEFAZ (requerem certificado e conexao real)",
+]

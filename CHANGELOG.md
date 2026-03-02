@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.2.76
+- fix: #63 — reduzir timeout padrao de run_nfe para 30s
+
+## 0.2.75
+- fix: #62 #63 — corrigir comentario cStat 137/138 e adicionar timeout=120 em run_nfe
+
+## 0.2.74
+- fix: #61 — serie configuravel via --serie nos testes E2E (padrao 99)
+
+## 0.2.73
+- feat: #59 — testes E2E via subprocess com --emitente/--destinatario parametrizaveis
+
 ## 0.2.72
 - fix: #57 — NSU e numeracao NF separados por ambiente no state.json
 
