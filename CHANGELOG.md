@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.69
+- fix: #44 — config.py carrega campos de endereco do INI
+
 ## 0.2.68
 - fix: #40 — mensagem amigavel quando emitente sem endereco configurado
 - fix: #41 — exit code 1 quando SEFAZ rejeita inutilizacao
