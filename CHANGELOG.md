@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.73
+- feat: #59 — testes E2E via subprocess com --emitente/--destinatario parametrizaveis
+
 ## 0.2.72
 - fix: #57 — NSU e numeracao NF separados por ambiente no state.json
 
