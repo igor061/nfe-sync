@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.85
+- fix: #82 — registrar cooldown para cStat=656 (Consumo Indevido)
+
 ## 0.2.84
 - refactor: #81 — mover validacao de endereco do emitente para emissao.py
 
