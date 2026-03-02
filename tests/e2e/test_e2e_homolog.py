@@ -10,6 +10,7 @@ Executar com:
 import os
 import re
 import pytest
+from lxml import etree
 from .conftest import run_nfe
 
 
@@ -91,3 +92,33 @@ class TestPendentesHomologacao:
     def test_pendentes_executa_sem_erro(self, emitente):
         result = run_nfe("pendentes", emitente)
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
+
+
+@pytest.fixture(scope="session")
+def nf_cancelada(nf_emitida, emitente, serie):
+    """Cancela a NF-e emitida pela fixture nf_emitida. Lê o protocolo do XML salvo."""
+    chave, _ = nf_emitida
+    xml_path = os.path.join(os.getcwd(), "xml", f"{chave}.xml")
+    assert os.path.exists(xml_path), f"XML da NF-e nao encontrado em {xml_path}"
+
+    tree = etree.parse(xml_path)
+    ns = {"ns": "http://www.portalfiscal.inf.br/nfe"}
+    prot_els = tree.xpath("//ns:nProt", namespaces=ns)
+    assert prot_els, f"Protocolo nao encontrado no XML {xml_path}"
+    protocolo = prot_els[0].text
+
+    result = run_nfe(
+        "cancelar", emitente, chave,
+        "--protocolo", protocolo,
+        "--justificativa", "Cancelamento de NF-e de teste E2E",
+    )
+    return result
+
+
+@pytest.mark.slow
+class TestCancelarHomologacao:
+    def test_cancelar_retorna_sucesso(self, nf_cancelada):
+        assert nf_cancelada.returncode == 0, (
+            f"stdout: {nf_cancelada.stdout}\nstderr: {nf_cancelada.stderr}"
+        )
+        assert "135" in nf_cancelada.stdout or "136" in nf_cancelada.stdout

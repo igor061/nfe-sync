@@ -67,3 +67,12 @@ class ResultadoInutilizacao:
     protocolo: str | None
     xml: str
     xml_resposta: str
+
+
+@dataclass(frozen=True, slots=True)
+class ResultadoCancelamento:
+    sucesso: bool        # True se cStat in ("135", "136")
+    resultados: list     # list[dict] de extract_status_motivo
+    protocolo: str | None
+    xml: str
+    xml_resposta: str

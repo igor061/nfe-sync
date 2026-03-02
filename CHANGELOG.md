@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.80
+- feat: cancelamento de NF-e via SEFAZ (EventoCancelarNota)
+
 ## 0.2.79
 - fix: #71 #72 — imprimir status/motivo antes de exit em consultar-nsu; tolerar cStat=656 no E2E
 
