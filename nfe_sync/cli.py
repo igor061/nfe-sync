@@ -9,6 +9,7 @@ from .commands.consulta import ConsultaBlueprint
 from .commands.manifestacao import ManifestacaoBlueprint
 from .commands.inutilizacao import InutilizacaoBlueprint
 from .commands.emissao import EmissaoBlueprint
+from .commands.cancelamento import CancelamentoBlueprint
 from .commands.sistema import SistemaBlueprint
 
 BLUEPRINTS = [
@@ -16,6 +17,7 @@ BLUEPRINTS = [
     ManifestacaoBlueprint(),
     InutilizacaoBlueprint(),
     EmissaoBlueprint(),
+    CancelamentoBlueprint(),
     SistemaBlueprint(),
 ]
 
@@ -41,6 +43,7 @@ def cli(argv=None):
             "  manifestar      Manifestar ciencia, confirmacao, desconhecimento ou nao-realizacao\n"
             "  inutilizar      Inutilizar faixa de numeracao de NF-e\n"
             "  emitir          Emitir NF-e de teste em homologacao\n"
+            "  cancelar        Cancela uma NF-e emitida na SEFAZ\n"
             "\n"
             "Sistema:\n"
             "  versao          Verificar versao instalada e atualizacoes disponiveis\n"
@@ -55,6 +58,7 @@ def cli(argv=None):
             "  nfe-sync manifestar     EMPRESA ciencia CHAVE\n"
             "  nfe-sync inutilizar     EMPRESA --serie 1 --inicio 5 --fim 8 --justificativa 'Motivo'\n"
             "  nfe-sync emitir         EMPRESA --serie 1\n"
+            "  nfe-sync cancelar       EMPRESA CHAVE --protocolo 135XXX --justificativa 'Motivo'\n"
         ),
     )
     amb = parser.add_mutually_exclusive_group()
