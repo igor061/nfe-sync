@@ -1,7 +1,9 @@
 import logging
 import traceback
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Callable
+
+_BRT = timezone(timedelta(hours=-3))
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .state import get_ultimo_nsu, set_ultimo_nsu, get_cooldown, set_cooldown, salvar_estado
@@ -42,6 +44,8 @@ def verificar_cooldown(bloqueado_ate: str | None) -> tuple[bool, str]:
         return False, ""
     try:
         dt = datetime.fromisoformat(bloqueado_ate)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_BRT)
         agora = _agora_brt()
         if agora < dt:
             restante = dt - agora

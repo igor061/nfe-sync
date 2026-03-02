@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.71
+- fix: #53 — agora_brt() preserva tzinfo BRT; corrige comparacoes naive/aware
+
 ## 0.2.70
 - fix: #50 #51 #52 — indicador_destino, indicador_ie e CFOP automaticos por UF
 
