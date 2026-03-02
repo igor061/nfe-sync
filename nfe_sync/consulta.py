@@ -256,7 +256,7 @@ def consultar_nsu(
         if ult_nsu >= max_nsu:
             break
 
-    if c_stat == "137":
+    if c_stat in ("137", "656"):
         set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
         if state_file:
             salvar_estado(state_file, estado)

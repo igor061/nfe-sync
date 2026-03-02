@@ -362,6 +362,45 @@ class TestProcessarDocsLogging:
         assert any("000000000000001" in r.message for r in caplog.records)
 
 
+class TestConsultarNsuCstat656:
+    """Issue #82: cStat=656 (Consumo Indevido) deve registrar cooldown."""
+
+    XML_656 = b"""<?xml version="1.0" encoding="utf-8"?>
+    <retDistDFeInt xmlns="http://www.portalfiscal.inf.br/nfe">
+        <tpAmb>2</tpAmb>
+        <cStat>656</cStat>
+        <xMotivo>Rejeicao: Consumo Indevido</xMotivo>
+        <ultNSU>000000000000000</ultNSU>
+        <maxNSU>000000000000000</maxNSU>
+    </retDistDFeInt>"""
+
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
+    def test_656_registra_cooldown(self, mock_sefaz_cls, empresa_sul, tmp_path):
+        mock_resp = MagicMock()
+        mock_resp.content = self.XML_656
+        mock_sefaz_cls.return_value.consulta_distribuicao.return_value = mock_resp
+
+        state_file = str(tmp_path / "state.json")
+        cnpj = empresa_sul.emitente.cnpj
+
+        consultar_nsu(empresa_sul, {}, state_file)
+
+        estado_salvo = carregar_estado(state_file)
+        assert f"{cnpj}:homologacao" in estado_salvo.get("cooldown", {}), \
+            "cStat=656 deve registrar cooldown no estado"
+
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
+    def test_656_sucesso_false(self, mock_sefaz_cls, empresa_sul, tmp_path):
+        mock_resp = MagicMock()
+        mock_resp.content = self.XML_656
+        mock_sefaz_cls.return_value.consulta_distribuicao.return_value = mock_resp
+
+        resultado = consultar_nsu(empresa_sul, {}, str(tmp_path / "state.json"))
+
+        assert resultado.sucesso is False
+        assert resultado.status == "656"
+
+
 class TestValidarChave:
     """Issue #21: validação local da chave de acesso antes de enviar à SEFAZ."""
 
