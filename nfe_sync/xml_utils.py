@@ -13,6 +13,19 @@ def agora_brt() -> datetime:
     """Retorna o datetime atual no fuso BRT (UTC-3), com tzinfo preservado."""
     return datetime.now(_BRT)
 
+
+def agora_local() -> datetime:
+    """Retorna o datetime atual no fuso horário LOCAL do sistema.
+
+    Necessário para eventos pynfe: SerializacaoXML.serializar_evento() usa o
+    timezone do SISTEMA (datetime.now().astimezone()) para montar o offset do
+    campo dhEvento, ignorando o tzinfo do datetime recebido. Passar um datetime
+    já convertido para o timezone local garante que o valor horário e o offset
+    sejam consistentes — evitando cStat=577 quando o servidor está em fuso
+    diferente do BRT. Issue #79.
+    """
+    return datetime.now().astimezone()
+
 # Seguro contra ataques XXE: sem resolucao de entidades externas ou DTD
 # Issue #3
 _PARSER = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False)

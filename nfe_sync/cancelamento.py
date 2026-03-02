@@ -5,7 +5,7 @@ from pynfe.processamento.assinatura import AssinaturaA1
 
 from .models import EmpresaConfig, validar_cnpj_sefaz
 from .exceptions import NfeValidationError
-from .xml_utils import extract_status_motivo, agora_brt, chamar_sefaz
+from .xml_utils import extract_status_motivo, agora_local, chamar_sefaz
 from .results import ResultadoCancelamento
 
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
@@ -28,7 +28,7 @@ def cancelar(
         _fonte_dados=fonte,
         cnpj=empresa.emitente.cnpj,
         chave=chave,
-        data_emissao=agora_brt(),
+        data_emissao=agora_local(),
         uf=empresa.uf,
         protocolo=protocolo,
         justificativa=justificativa,
