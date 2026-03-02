@@ -141,7 +141,8 @@ def consultar(empresa: EmpresaConfig, chave: str) -> ResultadoConsulta:
     validar_cnpj_sefaz(empresa.emitente.cnpj, empresa.nome)
     uf = _uf_da_chave(chave) or empresa.uf
 
-    xml_sit, xml_resposta = chamar_sefaz(empresa, "consulta_nota", uf=uf, modelo="nfe", chave=chave)
+    with empresa.certificado.cert_path() as cert_path:
+        xml_sit, xml_resposta = chamar_sefaz(empresa, "consulta_nota", uf=uf, modelo="nfe", chave=chave, cert_path=cert_path)
     situacao = extract_status_motivo(xml_sit, NS)
 
     primeiro_stat = situacao[0]["status"] if situacao else ""
@@ -164,7 +165,8 @@ def consultar_dfe_chave(empresa: EmpresaConfig, chave: str) -> ResultadoDfeChave
     cnpj = empresa.emitente.cnpj
     uf = _uf_da_chave(chave) or empresa.uf
 
-    xml_resp, xml_resposta = chamar_sefaz(empresa, "consulta_distribuicao", uf=uf, cnpj=cnpj, chave=chave)
+    with empresa.certificado.cert_path() as cert_path:
+        xml_resp, xml_resposta = chamar_sefaz(empresa, "consulta_distribuicao", uf=uf, cnpj=cnpj, chave=chave, cert_path=cert_path)
 
     # escalares — não lista; manter inline
     status = xml_resp.xpath("//ns:cStat", namespaces=NS)
@@ -209,8 +211,6 @@ def consultar_nsu(
     if nsu is None:
         nsu = get_ultimo_nsu(estado, cnpj, ambiente)
 
-    con = criar_comunicacao(empresa)
-
     documentos = []
     xmls_resposta = []
     ult_nsu = nsu
@@ -219,42 +219,45 @@ def consultar_nsu(
     x_motivo = None
     pagina = 0
 
-    while True:
-        pagina += 1
-        resp = _com_retry(con.consulta_distribuicao, cnpj=cnpj, nsu=ult_nsu)
+    with empresa.certificado.cert_path() as cert_path:
+        con = criar_comunicacao(empresa, cert_path=cert_path)
 
-        xml_resp = safe_fromstring(resp.content if hasattr(resp, "content") else resp)
+        while True:
+            pagina += 1
+            resp = _com_retry(con.consulta_distribuicao, cnpj=cnpj, nsu=ult_nsu)
 
-        # escalares — não lista
-        status = xml_resp.xpath("//ns:cStat", namespaces=NS)
-        motivo = xml_resp.xpath("//ns:xMotivo", namespaces=NS)
-        c_stat = status[0].text if status else None
-        x_motivo = motivo[0].text if motivo else None
+            xml_resp = safe_fromstring(resp.content if hasattr(resp, "content") else resp)
 
-        ult_nsu_el = xml_resp.xpath("//ns:ultNSU", namespaces=NS)
-        max_nsu_el = xml_resp.xpath("//ns:maxNSU", namespaces=NS)
-        ult_nsu = int(ult_nsu_el[0].text) if ult_nsu_el else ult_nsu
-        max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
+            # escalares — não lista
+            status = xml_resp.xpath("//ns:cStat", namespaces=NS)
+            motivo = xml_resp.xpath("//ns:xMotivo", namespaces=NS)
+            c_stat = status[0].text if status else None
+            x_motivo = motivo[0].text if motivo else None
 
-        xmls_resposta.append(to_xml_string(xml_resp))
+            ult_nsu_el = xml_resp.xpath("//ns:ultNSU", namespaces=NS)
+            max_nsu_el = xml_resp.xpath("//ns:maxNSU", namespaces=NS)
+            ult_nsu = int(ult_nsu_el[0].text) if ult_nsu_el else ult_nsu
+            max_nsu = int(max_nsu_el[0].text) if max_nsu_el else ult_nsu
 
-        if c_stat != "138":
-            break
+            xmls_resposta.append(to_xml_string(xml_resp))
 
-        docs = _processar_docs(xml_resp)
-        documentos.extend(docs)
+            if c_stat != "138":
+                break
 
-        set_ultimo_nsu(estado, cnpj, ult_nsu, ambiente)
-        # Issue #7: salvar estado a cada _SALVAR_A_CADA páginas ou na última
-        if pagina % _SALVAR_A_CADA == 0 or ult_nsu >= max_nsu:
-            if state_file:
-                salvar_estado(state_file, estado)
+            docs = _processar_docs(xml_resp)
+            documentos.extend(docs)
 
-        if callback:
-            callback(pagina, len(documentos), ult_nsu, max_nsu)
+            set_ultimo_nsu(estado, cnpj, ult_nsu, ambiente)
+            # Issue #7: salvar estado a cada _SALVAR_A_CADA páginas ou na última
+            if pagina % _SALVAR_A_CADA == 0 or ult_nsu >= max_nsu:
+                if state_file:
+                    salvar_estado(state_file, estado)
 
-        if ult_nsu >= max_nsu:
-            break
+            if callback:
+                callback(pagina, len(documentos), ult_nsu, max_nsu)
+
+            if ult_nsu >= max_nsu:
+                break
 
     if c_stat in ("137", "656"):
         set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)

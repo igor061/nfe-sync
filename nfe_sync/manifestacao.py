@@ -64,10 +64,10 @@ def manifestar(
     serializar = SerializacaoXML(fonte, homologacao=empresa.homologacao)
     xml_evento = serializar.serializar_evento(evento)
 
-    assinatura = AssinaturaA1(empresa.certificado.path, empresa.certificado.senha)
-    xml_assinado = assinatura.assinar(xml_evento)
-
-    xml_resp, xml_resp_str = chamar_sefaz(empresa, "evento", modelo="nfe", evento=xml_assinado)
+    with empresa.certificado.cert_path() as cert_path:
+        assinatura = AssinaturaA1(cert_path, empresa.certificado.senha)
+        xml_assinado = assinatura.assinar(xml_evento)
+        xml_resp, xml_resp_str = chamar_sefaz(empresa, "evento", modelo="nfe", evento=xml_assinado, cert_path=cert_path)
     resultados = extract_status_motivo(xml_resp, NS)
     protocolos = xml_resp.xpath("//ns:nProt", namespaces=NS)
 

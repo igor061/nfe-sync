@@ -65,3 +65,48 @@ class TestEmitenteValidarCnpj:
     def test_cnpj_mod11_invalido(self):
         with pytest.raises(ValidationError, match="verificadores"):
             Emitente(cnpj="11222333000199")
+
+
+class TestCertificadoCertPath:
+    """Issue #94: Certificado.cert_path() suporta bytes (banco de dados) e path (disco)."""
+
+    def test_cert_path_com_arquivo_retorna_path_original(self, tmp_path):
+        """Certificado com path: cert_path() retorna o mesmo path."""
+        from nfe_sync.models import Certificado
+        cert_file = tmp_path / "cert.pfx"
+        cert_file.write_bytes(b"fake-cert")
+        cert = Certificado(path=str(cert_file), senha="123")
+        with cert.cert_path() as path:
+            assert path == str(cert_file)
+
+    def test_cert_path_com_conteudo_cria_temp_file(self):
+        """Certificado com conteudo: cert_path() grava em tempfile e retorna o path."""
+        import os
+        from nfe_sync.models import Certificado
+        conteudo = b"bytes-do-banco-de-dados"
+        cert = Certificado(path="", senha="123", conteudo=conteudo)
+        with cert.cert_path() as path:
+            assert os.path.exists(path)
+            assert open(path, "rb").read() == conteudo
+
+    def test_cert_path_temp_file_removido_ao_sair(self):
+        """Certificado com conteudo: tempfile é removido ao sair do context manager."""
+        import os
+        from nfe_sync.models import Certificado
+        cert = Certificado(path="", senha="123", conteudo=b"cert-bytes")
+        with cert.cert_path() as path:
+            temp_path = path
+        assert not os.path.exists(temp_path)
+
+    def test_cert_path_com_arquivo_nao_cria_tempfile(self, tmp_path):
+        """Certificado com path: cert_path() não cria arquivo temporário extra."""
+        import os
+        import tempfile
+        from nfe_sync.models import Certificado
+        cert_file = tmp_path / "cert.pfx"
+        cert_file.write_bytes(b"fake-cert")
+        cert = Certificado(path=str(cert_file), senha="123")
+        tmp_antes = set(os.listdir(tempfile.gettempdir()))
+        with cert.cert_path() as path:
+            tmp_durante = set(os.listdir(tempfile.gettempdir()))
+        assert tmp_durante == tmp_antes  # nenhum temp criado

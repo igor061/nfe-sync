@@ -1,5 +1,8 @@
+from contextlib import contextmanager
 from decimal import Decimal
 import re
+import tempfile
+import os
 
 from pydantic import BaseModel, field_validator
 
@@ -44,6 +47,26 @@ def validar_cnpj_sefaz(cnpj: str, contexto: str = "") -> None:
 class Certificado(BaseModel):
     path: str
     senha: str
+    conteudo: bytes | None = None
+
+    @contextmanager
+    def cert_path(self):
+        """Context manager que resolve o path do certificado.
+
+        Se `conteudo` estiver preenchido (certificado vindo de banco de dados),
+        grava em arquivo temporário e retorna o path. O arquivo é removido ao sair.
+        Se não, retorna `path` diretamente sem criar arquivo temporário.
+        """
+        if self.conteudo is not None:
+            fd, tmp = tempfile.mkstemp(suffix=".pfx")
+            try:
+                os.write(fd, self.conteudo)
+                os.close(fd)
+                yield tmp
+            finally:
+                os.unlink(tmp)
+        else:
+            yield self.path
 
 
 class Endereco(BaseModel):

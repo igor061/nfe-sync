@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.93
+- feat: #94 — Certificado.conteudo bytes + cert_path() para certificados em banco de dados
+
 ## 0.2.92
 - feat: #92 — consultar-nsu sem empresa itera todos os cadastros
 
