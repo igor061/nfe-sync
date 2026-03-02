@@ -29,7 +29,7 @@ def cancelar(
         cnpj=empresa.emitente.cnpj,
         chave=chave,
         data_emissao=agora_brt(),
-        uf="AN",
+        uf=empresa.uf,
         protocolo=protocolo,
         justificativa=justificativa,
         n_seq_evento=1,
