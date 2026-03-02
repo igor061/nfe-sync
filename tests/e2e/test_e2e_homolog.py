@@ -13,25 +13,28 @@ import pytest
 from .conftest import run_nfe
 
 
+@pytest.fixture(scope="session")
+def nf_emitida(emitente, serie):
+    """Emite uma NF-e de teste e retorna (chave, numero). Escopo session:
+    emite uma única vez e compartilha entre testes — evita cStat=539 (#66).
+    """
+    result = run_nfe("emitir", emitente, "--serie", serie)
+    assert result.returncode == 0, f"Falha ao emitir NF fixture:\n{result.stdout}"
+    match = re.search(r"Chave: (\d{44})", result.stdout)
+    assert match, f"Chave não encontrada:\n{result.stdout}"
+    match_num = re.search(r"Numero NF (\d+) serie", result.stdout)
+    assert match_num
+    return match.group(1), int(match_num.group(1))
+
+
 @pytest.mark.slow
 class TestEmitirHomologacao:
-    def test_emitir_cria_xml(self, emitente, serie, backup_state, tmp_path):
-        result = run_nfe("emitir", emitente, "--serie", serie)
-
-        assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert "Status:" in result.stdout
-        assert "Protocolo:" in result.stdout
-        assert "Chave:" in result.stdout
-
-        # chave de 44 dígitos aparece na saída
-        match = re.search(r"Chave: (\d{44})", result.stdout)
-        assert match, f"Chave 44 dígitos não encontrada na saída:\n{result.stdout}"
-
-        chave = match.group(1)
+    def test_emitir_cria_xml(self, nf_emitida):
+        chave, _ = nf_emitida
         xml_path = os.path.join(os.getcwd(), "xml", f"{chave}.xml")
         assert os.path.exists(xml_path), f"XML não criado em {xml_path}"
 
-    def test_emitir_com_destinatario(self, emitente, destinatario, serie, backup_state):
+    def test_emitir_com_destinatario(self, emitente, destinatario, serie):
         if destinatario is None:
             pytest.skip("--destinatario nao fornecido")
 
@@ -44,22 +47,15 @@ class TestEmitirHomologacao:
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
         assert "Status:" in result.stdout
 
-    def test_emitir_incrementa_numero(self, emitente, serie, backup_state):
-        result1 = run_nfe("emitir", emitente, "--serie", serie)
-        assert result1.returncode == 0, result1.stdout
+    def test_emitir_incrementa_numero(self, emitente, serie, nf_emitida):
+        _, numero_anterior = nf_emitida
 
-        match1 = re.search(r"Numero NF (\d+) serie", result1.stdout)
-        assert match1
-        numero1 = int(match1.group(1))
+        result = run_nfe("emitir", emitente, "--serie", serie)
+        assert result.returncode == 0, result.stdout
 
-        result2 = run_nfe("emitir", emitente, "--serie", serie)
-        assert result2.returncode == 0, result2.stdout
-
-        match2 = re.search(r"Numero NF (\d+) serie", result2.stdout)
-        assert match2
-        numero2 = int(match2.group(1))
-
-        assert numero2 == numero1 + 1
+        match = re.search(r"Numero NF (\d+) serie", result.stdout)
+        assert match
+        assert int(match.group(1)) == numero_anterior + 1
 
 
 @pytest.mark.slow

@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 import subprocess
@@ -8,6 +7,13 @@ import pytest
 
 STATE_FILE = ".state.json"
 DOWNLOADS_DIR = "downloads"
+
+
+def pytest_configure(config):
+    """Registra markers para evitar PytestUnknownMarkWarning (#65)."""
+    config.addinivalue_line(
+        "markers", "slow: testes que chamam a SEFAZ (requerem certificado e conexao real)"
+    )
 
 
 def pytest_addoption(parser):
@@ -46,9 +52,14 @@ def serie(request):
     return request.config.getoption("--serie")
 
 
-def run_nfe(*args, cwd=None, timeout=30) -> subprocess.CompletedProcess:
-    """Executa o CLI nfe-sync com os argumentos fornecidos."""
-    cmd = [sys.executable, "-m", "nfe_sync.cli"] + list(args)
+def run_nfe(*args, homologacao=True, cwd=None, timeout=30) -> subprocess.CompletedProcess:
+    """Executa o CLI nfe-sync com os argumentos fornecidos.
+
+    homologacao=True (padrão) injeta --homologacao antes do subcomando,
+    garantindo que os testes nunca rodem contra produção (#64).
+    """
+    flags = ["--homologacao"] if homologacao else []
+    cmd = [sys.executable, "-m", "nfe_sync.cli"] + flags + list(args)
     return subprocess.run(
         cmd,
         capture_output=True,
@@ -60,7 +71,11 @@ def run_nfe(*args, cwd=None, timeout=30) -> subprocess.CompletedProcess:
 
 @pytest.fixture
 def backup_state(tmp_path):
-    """Salva e restaura o .state.json ao redor de cada teste."""
+    """Salva e restaura o .state.json ao redor de cada teste.
+
+    Usar apenas em testes que NÃO emitem NF-e: restaurar o contador
+    após uma emissão bem-sucedida causa cStat=539 na SEFAZ (#66).
+    """
     state_path = os.path.join(os.getcwd(), STATE_FILE)
     backup_path = tmp_path / "state_backup.json"
 
