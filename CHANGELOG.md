@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.75
+- fix: #62 #63 — corrigir comentario cStat 137/138 e adicionar timeout=120 em run_nfe
+
 ## 0.2.74
 - fix: #61 — serie configuravel via --serie nos testes E2E (padrao 99)
 

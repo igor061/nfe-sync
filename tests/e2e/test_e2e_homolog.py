@@ -67,7 +67,7 @@ class TestConsultarNsuHomologacao:
     def test_consultar_nsu_executa_sem_erro(self, emitente):
         result = run_nfe("consultar-nsu", emitente)
 
-        # status 138 = sem documentos, ou 137 = documentos encontrados
+        # status 137 = nenhum documento localizado, 138 = documentos encontrados
         # ambos são sucesso (returncode 0)
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
         assert "Status:" in result.stdout

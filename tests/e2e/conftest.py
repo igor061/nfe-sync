@@ -46,7 +46,7 @@ def serie(request):
     return request.config.getoption("--serie")
 
 
-def run_nfe(*args, cwd=None) -> subprocess.CompletedProcess:
+def run_nfe(*args, cwd=None, timeout=120) -> subprocess.CompletedProcess:
     """Executa o CLI nfe-sync com os argumentos fornecidos."""
     cmd = [sys.executable, "-m", "nfe_sync.cli"] + list(args)
     return subprocess.run(
@@ -54,6 +54,7 @@ def run_nfe(*args, cwd=None) -> subprocess.CompletedProcess:
         capture_output=True,
         text=True,
         cwd=cwd or os.getcwd(),
+        timeout=timeout,
     )
 
 
