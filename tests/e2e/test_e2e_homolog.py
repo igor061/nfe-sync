@@ -66,6 +66,10 @@ class TestConsultarNsuHomologacao:
     def test_consultar_nsu_executa_sem_erro(self, emitente):
         result = run_nfe("consultar-nsu", emitente)
 
+        # 656 = consumo indevido (rate limit SEFAZ) — não é erro do CLI
+        if "656" in result.stdout:
+            pytest.skip("SEFAZ rate limit (cStat=656) — tente novamente apos 1 hora")
+
         # status 137 = nenhum documento localizado, 138 = documentos encontrados
         # ambos são sucesso (returncode 0)
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
@@ -73,6 +77,10 @@ class TestConsultarNsuHomologacao:
 
     def test_consultar_nsu_zerar_executa(self, emitente, backup_state):
         result = run_nfe("consultar-nsu", emitente, "--zerar-nsu")
+
+        # 656 = consumo indevido (rate limit SEFAZ) — não é erro do CLI
+        if "656" in result.stdout:
+            pytest.skip("SEFAZ rate limit (cStat=656) — tente novamente apos 1 hora")
 
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
         assert "NSU zerado" in result.stdout

@@ -280,3 +280,37 @@ class TestCmdConsultarExitCode:
 
         from nfe_sync.commands.consulta import cmd_consultar_nsu
         cmd_consultar_nsu(args)  # não deve levantar SystemExit
+
+    @patch("nfe_sync.commands.consulta._carregar")
+    @patch("nfe_sync.commands.consulta._salvar_log_xml")
+    @patch("nfe_sync.commands.consulta.consultar_nsu")
+    def test_nsu_erro_imprime_status_antes_de_sair(self, mock_nsu, mock_log, mock_carregar, capsys):
+        """Issue #71: consultar_nsu com sucesso=False deve imprimir status e motivo antes do exit."""
+        mock_carregar.return_value = (self._make_mock_empresa(), {})
+        mock_log.return_value = "log/x.xml"
+        mock_nsu.return_value = ResultadoDistribuicao(
+            sucesso=False,
+            status="656",
+            motivo="Consumo Indevido",
+            ultimo_nsu=0,
+            max_nsu=0,
+            documentos=[],
+            xmls_resposta=[],
+            estado={},
+        )
+
+        args = MagicMock()
+        args.empresa = "SUL"
+        args.nsu = None
+        args.zerar_nsu = False
+        args.chave = None
+        args.producao = False
+        args.homologacao = False
+
+        from nfe_sync.commands.consulta import cmd_consultar_nsu
+        with pytest.raises(SystemExit) as exc:
+            cmd_consultar_nsu(args)
+        assert exc.value.code == 1
+        out = capsys.readouterr().out
+        assert "656" in out
+        assert "Consumo Indevido" in out
