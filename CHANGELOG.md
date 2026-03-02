@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.83
+- fix: #79 — dhEvento usa timezone local do sistema (agora_local) evitando cStat=577
+
 ## 0.2.82
 - fix: #76 #77 — cancelar usa uf do emitente (nao AN); teste de saida nao duplicada
 

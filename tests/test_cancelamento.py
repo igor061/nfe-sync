@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from unittest.mock import patch
 from pynfe.utils import etree
 
@@ -59,6 +60,37 @@ class TestCancelarUF:
         kwargs = mock_evento.call_args.kwargs
         assert kwargs["uf"] == empresa_sul.uf
         assert kwargs["uf"] != "AN"
+
+
+class TestCancelarTimezone:
+    """#79: data_emissao deve usar agora_local() — timezone do sistema, não BRT fixo."""
+
+    def test_usa_agora_local_nao_agora_brt(self, empresa_sul):
+        """cancelar() deve chamar agora_local(), não agora_brt().
+
+        pynfe serializa dhEvento usando o timezone do SISTEMA independente do tzinfo
+        do datetime passado. Usar agora_local() garante consistência e evita
+        cStat=577 em servidores fora do BRT. Issue #79.
+        """
+        xml_bytes = (
+            b'<?xml version="1.0"?>'
+            b'<retEnvEvento xmlns="http://www.portalfiscal.inf.br/nfe">'
+            b'<retEvento><infEvento>'
+            b'<cStat>135</cStat><xMotivo>ok</xMotivo>'
+            b'</infEvento></retEvento></retEnvEvento>'
+        )
+        xml_el = etree.fromstring(xml_bytes)
+        data_local_mock = datetime(2026, 3, 2, 4, 42, 0, tzinfo=datetime.now().astimezone().tzinfo)
+
+        with patch("nfe_sync.cancelamento.agora_local", return_value=data_local_mock) as mock_local, \
+             patch("nfe_sync.cancelamento.EventoCancelarNota") as mock_evento, \
+             patch("nfe_sync.cancelamento.SerializacaoXML"), \
+             patch("nfe_sync.cancelamento.AssinaturaA1"), \
+             patch("nfe_sync.cancelamento.chamar_sefaz", return_value=(xml_el, xml_bytes.decode())):
+            cancelar(empresa_sul, CHAVE_VALIDA, PROTOCOLO_VALIDO, JUSTIFICATIVA_VALIDA)
+
+        mock_local.assert_called_once()
+        assert mock_evento.call_args.kwargs["data_emissao"] == data_local_mock
 
 
 class TestCancelarSaida:
