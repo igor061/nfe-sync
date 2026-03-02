@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.91
+- fix: consultar-nsu usa state file original (.state.json) em TestFluxoCompleto
+
 ## 0.2.90
 - feat: adicionar consultar-nsu com state file isolado em TestFluxoCompleto (etapas 7 e 8)
 

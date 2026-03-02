@@ -5,7 +5,6 @@ Requer emitente e destinatário configurados:
     pytest tests/e2e/test_fluxo_completo.py -v \\
         --emitente SUL --destinatario SRNACIONAL --serie 99
 """
-import os
 import re
 import pytest
 from .conftest import run_nfe
@@ -31,12 +30,6 @@ def nf_fluxo(emitente, destinatario, serie):
     assert match_prot, f"Protocolo nao encontrado na saida:\n{result.stdout}"
 
     return {"chave": match_chave.group(1), "protocolo": match_prot.group(1)}
-
-
-@pytest.fixture(scope="class")
-def state_dir(tmp_path_factory):
-    """Diretório temporário isolado para os state files do fluxo completo."""
-    return tmp_path_factory.mktemp("fluxo_state")
 
 
 @pytest.mark.slow
@@ -83,22 +76,16 @@ class TestFluxoCompleto:
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
         assert re.search(r"cStat=101\b", result.stdout), f"cStat=101 nao encontrado:\n{result.stdout}"
 
-    def test_consultar_nsu_emitente(self, nf_fluxo, emitente, state_dir):
-        """Etapa 7: EMITENTE sincroniza via distribuição DFe usando state file isolado."""
-        state_file = str(state_dir / f"state_{emitente}.json")
-        env = {**os.environ, "NFE_SYNC_STATE": state_file}
-        result = run_nfe("consultar-nsu", emitente, env=env)
+    def test_consultar_nsu_emitente(self, nf_fluxo, emitente):
+        """Etapa 7: EMITENTE sincroniza via distribuição DFe."""
+        result = run_nfe("consultar-nsu", emitente)
         if "656" in result.stdout or "BLOQUEADO" in result.stdout:
             pytest.skip("SEFAZ rate limit ou cooldown ativo — tente novamente apos 1 hora")
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert os.path.exists(state_file), "State file nao foi criado pelo consultar-nsu"
 
-    def test_consultar_nsu_destinatario(self, nf_fluxo, destinatario, state_dir):
-        """Etapa 8: DESTINATARIO sincroniza via distribuição DFe usando state file isolado."""
-        state_file = str(state_dir / f"state_{destinatario}.json")
-        env = {**os.environ, "NFE_SYNC_STATE": state_file}
-        result = run_nfe("consultar-nsu", destinatario, env=env)
+    def test_consultar_nsu_destinatario(self, nf_fluxo, destinatario):
+        """Etapa 8: DESTINATARIO sincroniza via distribuição DFe."""
+        result = run_nfe("consultar-nsu", destinatario)
         if "656" in result.stdout or "BLOQUEADO" in result.stdout:
             pytest.skip("SEFAZ rate limit ou cooldown ativo — tente novamente apos 1 hora")
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert os.path.exists(state_file), "State file nao foi criado pelo consultar-nsu"
