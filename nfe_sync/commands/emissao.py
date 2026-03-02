@@ -3,7 +3,8 @@ import os
 import sys
 from decimal import Decimal
 
-from . import CliBlueprint, _carregar, _salvar_log_xml
+from . import CliBlueprint, _carregar, _salvar_log_xml, CONFIG_FILE
+from ..config import carregar_empresas
 from ..state import get_ultimo_numero_nf, set_ultimo_numero_nf, salvar_estado
 from ..models import Destinatario, Produto, Pagamento, DadosEmissao, Endereco
 
@@ -33,21 +34,47 @@ def cmd_emitir(args):
         print(f"  api_cli cnpjws {emi.cnpj} --salvar-ini {empresa.nome}")
         sys.exit(1)
 
+    # Destinatário: empresa especificada via --destinatario ou o próprio emitente
+    if args.destinatario:
+        todas_empresas = carregar_empresas(CONFIG_FILE)
+        if args.destinatario not in todas_empresas:
+            print(f"Erro: destinatario '{args.destinatario}' nao encontrado.")
+            print(f"Empresas disponiveis: {', '.join(todas_empresas.keys())}")
+            sys.exit(1)
+        dest_emi = todas_empresas[args.destinatario].emitente
+        dest_end = dest_emi.endereco
+        if dest_end is None:
+            print(f"Erro: Destinatario '{args.destinatario}' sem endereco configurado.")
+            print(f"Preencha os dados cadastrais com:")
+            print(f"  api_cli cnpjws {dest_emi.cnpj} --salvar-ini {args.destinatario}")
+            sys.exit(1)
+    else:
+        dest_emi = emi
+        dest_end = end
+
+    # Issues #50, #51, #52: ajustar indicador_destino, indicador_ie e CFOP
+    # conforme UF do destinatário vs emitente
+    interestadual = dest_end.uf.upper() != end.uf.upper()
+    indicador_destino = 2 if interestadual else 1
+    indicador_ie = 1 if dest_emi.inscricao_estadual else 9
+    cfop = "6102" if interestadual else "5102"
+
     dados = DadosEmissao(
+        indicador_destino=indicador_destino,
         destinatario=Destinatario(
             razao_social="NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL",
             tipo_documento="CNPJ",
-            numero_documento=emi.cnpj,
-            indicador_ie=1,
-            inscricao_estadual=emi.inscricao_estadual,
+            numero_documento=dest_emi.cnpj,
+            indicador_ie=indicador_ie,
+            inscricao_estadual=dest_emi.inscricao_estadual,
             endereco=Endereco(
-                logradouro=end.logradouro,
-                numero=end.numero,
-                bairro=end.bairro,
-                municipio=end.municipio,
-                cod_municipio=end.cod_municipio,
-                uf=end.uf,
-                cep=end.cep,
+                logradouro=dest_end.logradouro,
+                numero=dest_end.numero,
+                bairro=dest_end.bairro,
+                municipio=dest_end.municipio,
+                cod_municipio=dest_end.cod_municipio,
+                uf=dest_end.uf,
+                cep=dest_end.cep,
             ),
         ),
         produtos=[
@@ -55,7 +82,7 @@ def cmd_emitir(args):
                 codigo="0001",
                 descricao="PRODUTO TESTE HOMOLOGACAO",
                 ncm="71131100",
-                cfop="5102",
+                cfop=cfop,
                 quantidade_comercial=Decimal("1.0000"),
                 valor_unitario_comercial=Decimal("10.00"),
                 quantidade_tributavel=Decimal("1.0000"),
@@ -110,4 +137,6 @@ class EmissaoBlueprint(CliBlueprint):
         )
         p.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
         p.add_argument("--serie", required=True, help="Serie da NF-e")
+        p.add_argument("--destinatario", default=None,
+                       help="Empresa destinataria (secao no nfe-sync.conf.ini). Se omitido, usa o emitente.")
         p.set_defaults(func=cmd_emitir)
