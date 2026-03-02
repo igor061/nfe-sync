@@ -10,8 +10,8 @@ _BRT = timezone(timedelta(hours=-3))
 
 
 def agora_brt() -> datetime:
-    """Retorna o datetime atual no fuso BRT (UTC-3) sem informação de timezone."""
-    return datetime.now(_BRT).replace(tzinfo=None)
+    """Retorna o datetime atual no fuso BRT (UTC-3), com tzinfo preservado."""
+    return datetime.now(_BRT)
 
 # Seguro contra ataques XXE: sem resolucao de entidades externas ou DTD
 # Issue #3

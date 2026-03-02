@@ -44,9 +44,13 @@ class TestVerificarCooldown:
 
 class TestCalcularProximoCooldown:
     def test_retorna_iso_futuro(self):
+        from datetime import timezone
         resultado = calcular_proximo_cooldown(60)
         dt = datetime.fromisoformat(resultado)
-        assert dt > datetime.now()
+        agora = datetime.now(timezone.utc)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        assert dt > agora
 
 
 class TestConsultarNsu:
@@ -206,11 +210,13 @@ class TestConsultarNsuCallback:
 
 
 class TestAgoraBrt:
-    """Issue #14: _agora_brt retorna datetime sem tzinfo."""
+    """Issue #53: _agora_brt retorna datetime com tzinfo BRT (-03:00)."""
 
-    def test_retorna_sem_tzinfo(self):
+    def test_retorna_com_tzinfo_brt(self):
+        from datetime import timedelta, timezone
         dt = _agora_brt()
-        assert dt.tzinfo is None
+        assert dt.tzinfo is not None
+        assert dt.utcoffset() == timedelta(hours=-3)
 
     def test_e_datetime(self):
         assert isinstance(_agora_brt(), datetime)

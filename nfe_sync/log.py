@@ -1,6 +1,6 @@
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pynfe.utils import etree
 
@@ -16,7 +16,7 @@ def _limpar_logs_antigos():
     for nome in os.listdir(LOG_DIR):
         caminho = os.path.join(LOG_DIR, nome)
         if os.path.isfile(caminho):
-            modificado = datetime.fromtimestamp(os.path.getmtime(caminho))
+            modificado = datetime.fromtimestamp(os.path.getmtime(caminho), tz=timezone.utc)
             if modificado < limite:
                 # Issue #13: tratar erros de remoção individualmente
                 try:

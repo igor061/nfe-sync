@@ -13,17 +13,19 @@ from nfe_sync.xml_utils import agora_brt as _agora_brt
 
 
 class TestAgora:
-    def test_retorna_datetime_sem_tzinfo(self):
+    def test_retorna_datetime_com_tzinfo_brt(self):
+        """Issue #53: tzinfo deve ser BRT (-03:00), não None."""
         dt = _agora_brt()
-        assert dt.tzinfo is None
+        assert dt.tzinfo is not None
+        assert dt.utcoffset() == timedelta(hours=-3)
 
     def test_aproximadamente_agora(self):
+        from datetime import timezone
         dt = _agora_brt()
-        agora_utc = datetime.utcnow()
-        # BRT é UTC-3, então deve estar cerca de 3h atrás do UTC
+        agora_utc = datetime.now(timezone.utc)
+        # BRT é UTC-3; diferença deve ser < 1 minuto
         diff = abs((agora_utc - dt).total_seconds())
-        # tolerância de 1 minuto para variações
-        assert diff < 3 * 3600 + 60
+        assert diff < 60
 
 
 class TestLimparLogsAntigos:
