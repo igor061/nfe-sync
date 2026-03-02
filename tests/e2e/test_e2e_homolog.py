@@ -47,15 +47,18 @@ class TestEmitirHomologacao:
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
         assert "Status:" in result.stdout
 
-    def test_emitir_incrementa_numero(self, emitente, serie, nf_emitida):
-        _, numero_anterior = nf_emitida
+    def test_emitir_incrementa_numero(self, emitente, serie):
+        result1 = run_nfe("emitir", emitente, "--serie", serie)
+        assert result1.returncode == 0, result1.stdout
+        match1 = re.search(r"Numero NF (\d+) serie", result1.stdout)
+        assert match1
 
-        result = run_nfe("emitir", emitente, "--serie", serie)
-        assert result.returncode == 0, result.stdout
+        result2 = run_nfe("emitir", emitente, "--serie", serie)
+        assert result2.returncode == 0, result2.stdout
+        match2 = re.search(r"Numero NF (\d+) serie", result2.stdout)
+        assert match2
 
-        match = re.search(r"Numero NF (\d+) serie", result.stdout)
-        assert match
-        assert int(match.group(1)) == numero_anterior + 1
+        assert int(match2.group(1)) == int(match1.group(1)) + 1
 
 
 @pytest.mark.slow

@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.78
+- fix: #68 #69 — fallback NSU/numeracao retorna 0 sem herdar chave legada; test_incrementa_numero autonomo
+
 ## 0.2.77
 - fix: #64 #65 #66 — homologacao forcado em run_nfe, marker slow via pytest_configure, fixture nf_emitida session-scoped
 

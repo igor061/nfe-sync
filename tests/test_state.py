@@ -89,10 +89,10 @@ class TestNumeracao:
         assert get_ultimo_numero_nf(estado, "123", "1", "homologacao") == 3
         assert get_ultimo_numero_nf(estado, "123", "1", "producao") == 10
 
-    def test_fallback_chave_legada(self):
-        """Issue #57: migração — chave antiga (cnpj:serie) usada como fallback."""
+    def test_chave_legada_sem_ambiente_retorna_zero(self):
+        """Issue #68: chave legada (cnpj:serie) sem ambiente retorna 0 — nao herda valor de outro ambiente."""
         estado = {"numeracao": {"123:1": 7}}
-        assert get_ultimo_numero_nf(estado, "123", "1", "producao") == 7
+        assert get_ultimo_numero_nf(estado, "123", "1", "producao") == 0
 
     def test_chave_nova_tem_prioridade_sobre_legada(self):
         """Issue #57: chave nova (cnpj:serie:ambiente) prevalece sobre legada."""
@@ -158,10 +158,10 @@ class TestNsu:
         assert get_ultimo_nsu(estado, "123", "homologacao") == 100
         assert get_ultimo_nsu(estado, "123", "producao") == 4059
 
-    def test_fallback_chave_legada(self):
-        """Issue #57: migração — chave antiga (cnpj) usada como fallback."""
+    def test_chave_legada_sem_ambiente_retorna_zero(self):
+        """Issue #68: chave legada (cnpj) sem ambiente retorna 0 — nao herda valor de outro ambiente."""
         estado = {"nsu": {"123": 4059}}
-        assert get_ultimo_nsu(estado, "123", "producao") == 4059
+        assert get_ultimo_nsu(estado, "123", "producao") == 0
 
     def test_chave_nova_tem_prioridade_sobre_legada(self):
         """Issue #57: chave nova (cnpj:ambiente) prevalece sobre legada."""
