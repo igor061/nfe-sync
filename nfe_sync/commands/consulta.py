@@ -102,7 +102,8 @@ def cmd_consultar_nsu(args):
     nsu = args.nsu
 
     if args.zerar_nsu:
-        set_ultimo_nsu(estado, cnpj, 0)
+        ambiente = "homologacao" if empresa.homologacao else "producao"
+        set_ultimo_nsu(estado, cnpj, 0, ambiente)
         salvar_estado(STATE_FILE, estado)
         nsu = 0
         print(f"NSU zerado para {cnpj}.")

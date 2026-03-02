@@ -81,6 +81,24 @@ class TestNumeracao:
         assert get_ultimo_numero_nf(estado, "123", "1") == 5
         assert get_ultimo_numero_nf(estado, "123", "2") == 12
 
+    def test_ambientes_independentes(self):
+        """Issue #57: homologacao e producao devem ter numeracoes separadas."""
+        estado = {}
+        set_ultimo_numero_nf(estado, "123", "1", 3, "homologacao")
+        set_ultimo_numero_nf(estado, "123", "1", 10, "producao")
+        assert get_ultimo_numero_nf(estado, "123", "1", "homologacao") == 3
+        assert get_ultimo_numero_nf(estado, "123", "1", "producao") == 10
+
+    def test_fallback_chave_legada(self):
+        """Issue #57: migração — chave antiga (cnpj:serie) usada como fallback."""
+        estado = {"numeracao": {"123:1": 7}}
+        assert get_ultimo_numero_nf(estado, "123", "1", "producao") == 7
+
+    def test_chave_nova_tem_prioridade_sobre_legada(self):
+        """Issue #57: chave nova (cnpj:serie:ambiente) prevalece sobre legada."""
+        estado = {"numeracao": {"123:1": 7, "123:1:producao": 15}}
+        assert get_ultimo_numero_nf(estado, "123", "1", "producao") == 15
+
 
 class TestCooldown:
     def test_get_inexistente(self):
@@ -131,3 +149,21 @@ class TestNsu:
         set_ultimo_nsu(estado, "222", 20)
         assert get_ultimo_nsu(estado, "111") == 10
         assert get_ultimo_nsu(estado, "222") == 20
+
+    def test_ambientes_independentes(self):
+        """Issue #57: homologacao e producao devem ter NSUs separados."""
+        estado = {}
+        set_ultimo_nsu(estado, "123", 100, "homologacao")
+        set_ultimo_nsu(estado, "123", 4059, "producao")
+        assert get_ultimo_nsu(estado, "123", "homologacao") == 100
+        assert get_ultimo_nsu(estado, "123", "producao") == 4059
+
+    def test_fallback_chave_legada(self):
+        """Issue #57: migração — chave antiga (cnpj) usada como fallback."""
+        estado = {"nsu": {"123": 4059}}
+        assert get_ultimo_nsu(estado, "123", "producao") == 4059
+
+    def test_chave_nova_tem_prioridade_sobre_legada(self):
+        """Issue #57: chave nova (cnpj:ambiente) prevalece sobre legada."""
+        estado = {"nsu": {"123": 4059, "123:producao": 5000}}
+        assert get_ultimo_nsu(estado, "123", "producao") == 5000

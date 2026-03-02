@@ -15,8 +15,9 @@ def cmd_emitir(args):
     empresa, estado = _carregar(args)
     cnpj = empresa.emitente.cnpj
     serie = args.serie
+    ambiente = "homologacao" if empresa.homologacao else "producao"
 
-    ultimo = get_ultimo_numero_nf(estado, cnpj, serie)
+    ultimo = get_ultimo_numero_nf(estado, cnpj, serie, ambiente)
     numero_nf = ultimo + 1
 
     print(f"Empresa: {empresa.nome} (CNPJ {cnpj})")
@@ -112,7 +113,7 @@ def cmd_emitir(args):
         print(f"Chave: {resultado.chave}")
         print(f"XML salvo em: {arquivo}")
 
-        set_ultimo_numero_nf(estado, cnpj, serie, numero_nf)
+        set_ultimo_numero_nf(estado, cnpj, serie, numero_nf, ambiente)
         salvar_estado(STATE_FILE, estado)
         print(f"Numero NF {numero_nf} serie {serie} salvo em {STATE_FILE}")
     else:
