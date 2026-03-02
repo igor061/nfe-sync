@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.0
+- release: versão 1.0.0 — estável com emissão, consulta, manifestação, inutilização, cancelamento e distribuição DFe
+
 ## 0.2.93
 - feat: #94 — Certificado.conteudo bytes + cert_path() para certificados em banco de dados
 
