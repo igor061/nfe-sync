@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.84
+- refactor: #81 — mover validacao de endereco do emitente para emissao.py
+
 ## 0.2.83
 - fix: #79 — dhEvento usa timezone local do sistema (agora_local) evitando cStat=577
 

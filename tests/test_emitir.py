@@ -102,6 +102,28 @@ class TestDadosEmissao:
             DadosEmissao(destinatario=None, produtos=[], pagamentos=[])
 
 
+class TestEmitirValidacaoEndereco:
+    """#81: emitir() deve levantar NfeValidationError quando emitente.endereco é None.
+
+    Destinatario.endereco é Endereco (obrigatório no Pydantic) — não pode ser None.
+    A validação do destinatário sem endereço é lógica de montagem do CLI e fica em
+    commands/emissao.py.
+    """
+
+    def test_emitente_sem_endereco_levanta_validation_error(self, dados_emissao_padrao):
+        from nfe_sync.emissao import emitir
+        from nfe_sync.exceptions import NfeValidationError
+        from nfe_sync.models import EmpresaConfig, Certificado, Emitente
+        empresa = EmpresaConfig(
+            nome="SUL",
+            certificado=Certificado(path="/tmp/cert.pfx", senha="123456"),
+            emitente=Emitente(cnpj="99999999000191", endereco=None),
+            uf="sp", homologacao=True,
+        )
+        with pytest.raises(NfeValidationError, match="endereco"):
+            emitir(empresa, "1", 1, dados_emissao_padrao)
+
+
 class TestComplementoTruncado:
     """Issue #54: complemento truncado a 60 chars na serialização para pynfe."""
 
