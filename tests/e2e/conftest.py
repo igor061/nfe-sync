@@ -21,6 +21,11 @@ def pytest_addoption(parser):
         default=None,
         help="Nome da empresa destinataria (secao no nfe-sync.conf.ini)",
     )
+    parser.addoption(
+        "--serie",
+        default="99",
+        help="Serie da NF-e usada nos testes E2E (padrao: 99, para evitar colisao com serie 1)",
+    )
 
 
 @pytest.fixture(scope="session")
@@ -34,6 +39,11 @@ def emitente(request):
 @pytest.fixture(scope="session")
 def destinatario(request):
     return request.config.getoption("--destinatario")
+
+
+@pytest.fixture(scope="session")
+def serie(request):
+    return request.config.getoption("--serie")
 
 
 def run_nfe(*args, cwd=None) -> subprocess.CompletedProcess:

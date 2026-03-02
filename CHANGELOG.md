@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.74
+- fix: #61 — serie configuravel via --serie nos testes E2E (padrao 99)
+
 ## 0.2.73
 - feat: #59 — testes E2E via subprocess com --emitente/--destinatario parametrizaveis
 
