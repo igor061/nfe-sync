@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.70
+- fix: #50 #51 #52 — indicador_destino, indicador_ie e CFOP automaticos por UF
+
 ## 0.2.69
 - fix: #44 — config.py carrega campos de endereco do INI
 - fix: #46 — cnpjws extrai cod_municipio do ibge_id e salva no INI

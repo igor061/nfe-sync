@@ -52,12 +52,20 @@ def cmd_emitir(args):
         dest_emi = emi
         dest_end = end
 
+    # Issues #50, #51, #52: ajustar indicador_destino, indicador_ie e CFOP
+    # conforme UF do destinatário vs emitente
+    interestadual = dest_end.uf.upper() != end.uf.upper()
+    indicador_destino = 2 if interestadual else 1
+    indicador_ie = 1 if dest_emi.inscricao_estadual else 9
+    cfop = "6102" if interestadual else "5102"
+
     dados = DadosEmissao(
+        indicador_destino=indicador_destino,
         destinatario=Destinatario(
             razao_social="NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL",
             tipo_documento="CNPJ",
             numero_documento=dest_emi.cnpj,
-            indicador_ie=1,
+            indicador_ie=indicador_ie,
             inscricao_estadual=dest_emi.inscricao_estadual,
             endereco=Endereco(
                 logradouro=dest_end.logradouro,
@@ -74,7 +82,7 @@ def cmd_emitir(args):
                 codigo="0001",
                 descricao="PRODUTO TESTE HOMOLOGACAO",
                 ncm="71131100",
-                cfop="5102",
+                cfop=cfop,
                 quantidade_comercial=Decimal("1.0000"),
                 valor_unitario_comercial=Decimal("10.00"),
                 quantidade_tributavel=Decimal("1.0000"),
