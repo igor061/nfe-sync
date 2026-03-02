@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.92
+- feat: #92 — consultar-nsu sem empresa itera todos os cadastros
+
 ## 0.2.91
 - fix: consultar-nsu usa state file original (.state.json) em TestFluxoCompleto
 
