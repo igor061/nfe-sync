@@ -96,8 +96,9 @@ def cmd_consultar(args):
         _processar_e_salvar_docs(cnpj, docs)
 
 
-def cmd_consultar_nsu(args):
-    empresa, estado = _carregar(args)
+def _cmd_consultar_nsu_empresa(empresa, args):
+    """Executa consultar-nsu para uma única empresa. Retorna True se sucesso."""
+    estado = carregar_estado(STATE_FILE)
     cnpj = empresa.emitente.cnpj
     nsu = args.nsu
 
@@ -134,20 +135,20 @@ def cmd_consultar_nsu(args):
         if docs:
             print(f"Documentos: {len(docs)}")
             _processar_e_salvar_docs(cnpj, docs)
-        return
+        return True
 
     resultado = consultar_nsu(empresa, estado, STATE_FILE, nsu=nsu, callback=progresso)
 
     if not resultado.sucesso and resultado.motivo and resultado.status is None:
         print(f"BLOQUEADO: {resultado.motivo}")
-        sys.exit(1)
+        return False
 
     if not resultado.sucesso:
         if resultado.status:
             print(f"Status: {resultado.status}")
         if resultado.motivo:
             print(f"Motivo: {resultado.motivo}")
-        sys.exit(1)
+        return False
 
     print(f"Status: {resultado.status}")
     print(f"Motivo: {resultado.motivo}")
@@ -211,6 +212,41 @@ def cmd_consultar_nsu(args):
                 print()
                 print(f"Ainda ha {len(ainda_pendentes)} resumo(s) pendente(s). Execute novamente para tentar novamente.")
 
+    return True
+
+
+def cmd_consultar_nsu(args):
+    if args.empresa:
+        empresa, _ = _carregar(args)
+        sucesso = _cmd_consultar_nsu_empresa(empresa, args)
+        if not sucesso:
+            sys.exit(1)
+    else:
+        if args.chave or args.zerar_nsu:
+            print("Erro: --chave e --zerar-nsu requerem empresa especificada.")
+            sys.exit(1)
+        todas = carregar_empresas(CONFIG_FILE)
+        if not todas:
+            print("Nenhuma empresa configurada.")
+            sys.exit(1)
+        falhas = []
+        for i, (nome, empresa_cfg) in enumerate(todas.items()):
+            if i > 0:
+                print()
+                print("=" * 60)
+                print()
+            if args.producao:
+                empresa_cfg = empresa_cfg.model_copy(update={"homologacao": False})
+            elif args.homologacao:
+                empresa_cfg = empresa_cfg.model_copy(update={"homologacao": True})
+            sucesso = _cmd_consultar_nsu_empresa(empresa_cfg, args)
+            if not sucesso:
+                falhas.append(nome)
+        if falhas:
+            print()
+            print(f"Falha em: {', '.join(falhas)}")
+            sys.exit(1)
+
 
 def cmd_pendentes(args):
     if args.empresa:
@@ -265,7 +301,7 @@ class ConsultaBlueprint(CliBlueprint):
                 "  nfe-sync consultar-nsu MINHAEMPRESA --zerar-nsu"
             ),
         )
-        p_nsu.add_argument("empresa", help="Nome da empresa (secao no nfe-sync.conf.ini)")
+        p_nsu.add_argument("empresa", nargs="?", default=None, help="Nome da empresa (omitir para consultar todas)")
         p_nsu.add_argument("--nsu", type=int, default=None, help="NSU inicial (padrao: ultimo NSU salvo)")
         p_nsu.add_argument("--zerar-nsu", action="store_true", help="Zera o NSU salvo e recomeça do inicio (ultimos 90 dias)")
         p_nsu.add_argument("--chave", default=None, help="Baixar documento DFe de uma chave especifica sem avançar o NSU")

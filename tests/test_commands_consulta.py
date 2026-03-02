@@ -314,3 +314,108 @@ class TestCmdConsultarExitCode:
         out = capsys.readouterr().out
         assert "656" in out
         assert "Consumo Indevido" in out
+
+
+class TestCmdConsultarNsuTodasEmpresas:
+    """Issue #92: sem empresa → itera todos os cadastros."""
+
+    def _make_resultado_sucesso(self):
+        return ResultadoDistribuicao(
+            sucesso=True, status="137", motivo="Nenhum documento localizado",
+            ultimo_nsu=0, max_nsu=0, documentos=[], xmls_resposta=["<r/>"], estado={},
+        )
+
+    def _make_resultado_falha(self):
+        return ResultadoDistribuicao(
+            sucesso=False, status="656", motivo="Consumo Indevido",
+            ultimo_nsu=0, max_nsu=0, documentos=[], xmls_resposta=[], estado={},
+        )
+
+    @patch("nfe_sync.commands.consulta._salvar_log_xml")
+    @patch("nfe_sync.commands.consulta.consultar_nsu")
+    @patch("nfe_sync.commands.consulta.carregar_empresas")
+    def test_sem_empresa_itera_todas(self, mock_empresas, mock_nsu, mock_log, capsys):
+        """Sem empresa: cmd_consultar_nsu deve chamar consultar_nsu para cada empresa."""
+        from unittest.mock import MagicMock
+        from nfe_sync.commands.consulta import cmd_consultar_nsu
+
+        emp1 = MagicMock(); emp1.emitente.cnpj = "11111111000191"; emp1.nome = "EMP1"; emp1.homologacao = True
+        emp2 = MagicMock(); emp2.emitente.cnpj = "22222222000191"; emp2.nome = "EMP2"; emp2.homologacao = True
+        mock_empresas.return_value = {"EMP1": emp1, "EMP2": emp2}
+        mock_nsu.return_value = self._make_resultado_sucesso()
+        mock_log.return_value = "log/x.xml"
+
+        args = MagicMock()
+        args.empresa = None
+        args.nsu = None
+        args.zerar_nsu = False
+        args.chave = None
+        args.producao = False
+        args.homologacao = False
+
+        cmd_consultar_nsu(args)  # não deve levantar SystemExit
+
+        assert mock_nsu.call_count == 2
+        out = capsys.readouterr().out
+        assert "EMP1" in out
+        assert "EMP2" in out
+
+    @patch("nfe_sync.commands.consulta._salvar_log_xml")
+    @patch("nfe_sync.commands.consulta.consultar_nsu")
+    @patch("nfe_sync.commands.consulta.carregar_empresas")
+    def test_sem_empresa_falha_parcial_sai_1(self, mock_empresas, mock_nsu, mock_log):
+        """Sem empresa: se qualquer empresa falhar, exit code 1 ao final."""
+        from unittest.mock import MagicMock
+        from nfe_sync.commands.consulta import cmd_consultar_nsu
+
+        emp1 = MagicMock(); emp1.emitente.cnpj = "11111111000191"; emp1.nome = "EMP1"; emp1.homologacao = True
+        emp2 = MagicMock(); emp2.emitente.cnpj = "22222222000191"; emp2.nome = "EMP2"; emp2.homologacao = True
+        mock_empresas.return_value = {"EMP1": emp1, "EMP2": emp2}
+        mock_nsu.side_effect = [self._make_resultado_sucesso(), self._make_resultado_falha()]
+        mock_log.return_value = "log/x.xml"
+
+        args = MagicMock()
+        args.empresa = None
+        args.nsu = None
+        args.zerar_nsu = False
+        args.chave = None
+        args.producao = False
+        args.homologacao = False
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_consultar_nsu(args)
+        assert exc.value.code == 1
+
+    def test_sem_empresa_chave_exige_empresa(self, capsys):
+        """--chave sem empresa deve sair com erro."""
+        from unittest.mock import MagicMock
+        from nfe_sync.commands.consulta import cmd_consultar_nsu
+
+        args = MagicMock()
+        args.empresa = None
+        args.chave = "52991299999999999999550010000000011000000010"
+        args.zerar_nsu = False
+        args.producao = False
+        args.homologacao = False
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_consultar_nsu(args)
+        assert exc.value.code == 1
+        assert "requerem empresa" in capsys.readouterr().out
+
+    def test_sem_empresa_zerar_nsu_exige_empresa(self, capsys):
+        """--zerar-nsu sem empresa deve sair com erro."""
+        from unittest.mock import MagicMock
+        from nfe_sync.commands.consulta import cmd_consultar_nsu
+
+        args = MagicMock()
+        args.empresa = None
+        args.chave = None
+        args.zerar_nsu = True
+        args.producao = False
+        args.homologacao = False
+
+        with pytest.raises(SystemExit) as exc:
+            cmd_consultar_nsu(args)
+        assert exc.value.code == 1
+        assert "requerem empresa" in capsys.readouterr().out
