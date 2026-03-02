@@ -79,13 +79,13 @@ class TestFluxoCompleto:
     def test_consultar_nsu_emitente(self, nf_fluxo, emitente):
         """Etapa 7: EMITENTE sincroniza via distribuição DFe. Skip se rate limit (656)."""
         result = run_nfe("consultar-nsu", emitente)
-        if "656" in result.stdout:
-            pytest.skip("SEFAZ rate limit (cStat=656) — tente novamente apos 1 hora")
+        if "656" in result.stdout or "BLOQUEADO" in result.stdout:
+            pytest.skip("SEFAZ rate limit ou cooldown ativo — tente novamente apos 1 hora")
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
 
     def test_consultar_nsu_destinatario(self, nf_fluxo, destinatario):
         """Etapa 8: DESTINATARIO sincroniza via distribuição DFe. Skip se rate limit (656)."""
         result = run_nfe("consultar-nsu", destinatario)
-        if "656" in result.stdout:
-            pytest.skip("SEFAZ rate limit (cStat=656) — tente novamente apos 1 hora")
+        if "656" in result.stdout or "BLOQUEADO" in result.stdout:
+            pytest.skip("SEFAZ rate limit ou cooldown ativo — tente novamente apos 1 hora")
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"

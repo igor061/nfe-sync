@@ -68,8 +68,9 @@ class TestConsultarNsuHomologacao:
         result = run_nfe("consultar-nsu", emitente)
 
         # 656 = consumo indevido (rate limit SEFAZ) — não é erro do CLI
-        if "656" in result.stdout:
-            pytest.skip("SEFAZ rate limit (cStat=656) — tente novamente apos 1 hora")
+        # BLOQUEADO = cooldown local ativo (setado após cStat=656) — issue #87
+        if "656" in result.stdout or "BLOQUEADO" in result.stdout:
+            pytest.skip("SEFAZ rate limit ou cooldown ativo — tente novamente apos 1 hora")
 
         # status 137 = nenhum documento localizado, 138 = documentos encontrados
         # ambos são sucesso (returncode 0)
@@ -80,8 +81,9 @@ class TestConsultarNsuHomologacao:
         result = run_nfe("consultar-nsu", emitente, "--zerar-nsu")
 
         # 656 = consumo indevido (rate limit SEFAZ) — não é erro do CLI
-        if "656" in result.stdout:
-            pytest.skip("SEFAZ rate limit (cStat=656) — tente novamente apos 1 hora")
+        # BLOQUEADO = cooldown local ativo (setado após cStat=656) — issue #87
+        if "656" in result.stdout or "BLOQUEADO" in result.stdout:
+            pytest.skip("SEFAZ rate limit ou cooldown ativo — tente novamente apos 1 hora")
 
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
         assert "NSU zerado" in result.stdout

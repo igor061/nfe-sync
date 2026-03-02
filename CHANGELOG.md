@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.88
+- fix: #87 — tolerar cooldown local (BLOQUEADO) em testes consultar-nsu E2E
+
 ## 0.2.87
 - fix: #88 #89 #90 — remover fail redundante, acoplar nsu_emitente ao fluxo, precisar asserts cStat
 
