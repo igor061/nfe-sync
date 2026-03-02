@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.82
+- fix: #76 #77 — cancelar usa uf do emitente (nao AN); teste de saida nao duplicada
+
 ## 0.2.81
 - fix: usar pynfe.utils.etree no E2E de cancelamento (lxml nao e dependencia direta)
 
