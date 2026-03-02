@@ -27,9 +27,7 @@ def salvar_estado(state_file: str, estado: dict) -> None:
 
 
 def get_ultimo_numero_nf(estado: dict, cnpj: str, serie: str, ambiente: str = "producao") -> int:
-    num = estado.get("numeracao", {})
-    # Tenta chave nova (cnpj:serie:ambiente), fallback para chave legada (cnpj:serie)
-    return num.get(f"{cnpj}:{serie}:{ambiente}", num.get(f"{cnpj}:{serie}", 0))
+    return estado.get("numeracao", {}).get(f"{cnpj}:{serie}:{ambiente}", 0)
 
 
 def set_ultimo_numero_nf(estado: dict, cnpj: str, serie: str, numero: int, ambiente: str = "producao") -> None:
@@ -54,9 +52,7 @@ def limpar_cooldown(estado: dict, cnpj: str, ambiente: str = "homologacao") -> N
 
 
 def get_ultimo_nsu(estado: dict, cnpj: str, ambiente: str = "producao") -> int:
-    nsu_dict = estado.get("nsu", {})
-    # Tenta chave nova (cnpj:ambiente), fallback para chave legada (cnpj)
-    return nsu_dict.get(f"{cnpj}:{ambiente}", nsu_dict.get(cnpj, 0))
+    return estado.get("nsu", {}).get(f"{cnpj}:{ambiente}", 0)
 
 
 def set_ultimo_nsu(estado: dict, cnpj: str, nsu: int, ambiente: str = "producao") -> None:

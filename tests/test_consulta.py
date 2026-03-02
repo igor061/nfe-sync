@@ -146,7 +146,7 @@ class TestConsultarNsu:
 
         state_file = str(tmp_path / "state.json")
         cnpj = empresa_sul.emitente.cnpj
-        estado = {"nsu": {cnpj: 50}}
+        estado = {"nsu": {f"{cnpj}:homologacao": 50}}
 
         consultar_nsu(empresa_sul, estado, state_file)
         mock_sefaz_cls.return_value.consulta_distribuicao.assert_called_once_with(
