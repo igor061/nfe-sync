@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.79
+- fix: #71 #72 — imprimir status/motivo antes de exit em consultar-nsu; tolerar cStat=656 no E2E
+
 ## 0.2.78
 - fix: #68 #69 — fallback NSU/numeracao retorna 0 sem herdar chave legada; test_incrementa_numero autonomo
 

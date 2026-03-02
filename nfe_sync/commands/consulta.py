@@ -143,6 +143,10 @@ def cmd_consultar_nsu(args):
         sys.exit(1)
 
     if not resultado.sucesso:
+        if resultado.status:
+            print(f"Status: {resultado.status}")
+        if resultado.motivo:
+            print(f"Motivo: {resultado.motivo}")
         sys.exit(1)
 
     print(f"Status: {resultado.status}")
