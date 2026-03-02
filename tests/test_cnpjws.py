@@ -1,4 +1,4 @@
-"""Testes para apis/cnpjws.py — Issue #46: cod_municipio extraído do ibge_id."""
+"""Testes para apis/cnpjws.py — Issues #46, #54."""
 from nfe_sync.apis.cnpjws import CnpjwsEmpresa
 
 DADOS_API = {
@@ -61,3 +61,65 @@ class TestCnpjwsFromApi:
     def test_municipio_extraido_do_nome(self):
         empresa = CnpjwsEmpresa.from_api(DADOS_API)
         assert empresa.endereco.municipio == "SAO PAULO"
+
+
+class TestSalvarIniComplemento:
+    """Issue #54: complemento com espaços múltiplos deve ser normalizado no _salvar_ini."""
+
+    def test_complemento_espacos_multiplos_normalizado(self, tmp_path):
+        import configparser
+        from unittest.mock import MagicMock, patch
+        from nfe_sync.apis.cli import _salvar_ini
+
+        empresa = MagicMock()
+        empresa.cnpj = "99999999000191"
+        empresa.razao_social = "EMPRESA TESTE"
+        empresa.nome_fantasia = ""
+        empresa.cnae_fiscal = 0
+        empresa.inscricoes_estaduais = []
+        empresa.endereco.logradouro = "RUA EXEMPLO"
+        empresa.endereco.numero = "100"
+        empresa.endereco.complemento = "QUADRA01                  LOTE  01                  LOJA  259"
+        empresa.endereco.bairro = "CENTRO"
+        empresa.endereco.municipio = "SAO PAULO"
+        empresa.endereco.cod_municipio = "3550308"
+        empresa.endereco.uf = "SP"
+        empresa.endereco.cep = "01310100"
+
+        ini_path = str(tmp_path / "test.ini")
+        with patch("nfe_sync.apis.cli.INI_FILE", ini_path):
+            _salvar_ini(empresa, "SUL")
+
+        cfg = configparser.ConfigParser()
+        cfg.read(ini_path)
+        complemento = cfg.get("SUL", "complemento")
+        assert "  " not in complemento  # sem espaços duplos
+        assert complemento == "QUADRA01 LOTE 01 LOJA 259"
+
+    def test_complemento_vazio_permanece_vazio(self, tmp_path):
+        from unittest.mock import MagicMock, patch
+        from nfe_sync.apis.cli import _salvar_ini
+        import configparser
+
+        empresa = MagicMock()
+        empresa.cnpj = "99999999000191"
+        empresa.razao_social = "EMPRESA TESTE"
+        empresa.nome_fantasia = ""
+        empresa.cnae_fiscal = 0
+        empresa.inscricoes_estaduais = []
+        empresa.endereco.logradouro = "RUA EXEMPLO"
+        empresa.endereco.numero = "100"
+        empresa.endereco.complemento = ""
+        empresa.endereco.bairro = "CENTRO"
+        empresa.endereco.municipio = "SAO PAULO"
+        empresa.endereco.cod_municipio = "3550308"
+        empresa.endereco.uf = "SP"
+        empresa.endereco.cep = "01310100"
+
+        ini_path = str(tmp_path / "test.ini")
+        with patch("nfe_sync.apis.cli.INI_FILE", ini_path):
+            _salvar_ini(empresa, "SUL")
+
+        cfg = configparser.ConfigParser()
+        cfg.read(ini_path)
+        assert cfg.get("SUL", "complemento") == ""

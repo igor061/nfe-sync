@@ -1,5 +1,6 @@
 import argparse
 import configparser
+import re
 import sys
 
 from .exceptions import ApiConfigError
@@ -67,7 +68,7 @@ def _salvar_ini(empresa, nome_secao: str):
     cfg.set(nome_secao, "regime_tributario", cfg.get(nome_secao, "regime_tributario", fallback="1"))
     cfg.set(nome_secao, "logradouro", end.logradouro)
     cfg.set(nome_secao, "numero", end.numero)
-    cfg.set(nome_secao, "complemento", end.complemento or "")
+    cfg.set(nome_secao, "complemento", re.sub(r'\s+', ' ', end.complemento or "").strip())
     cfg.set(nome_secao, "bairro", end.bairro)
     cfg.set(nome_secao, "municipio", end.municipio)
     cfg.set(nome_secao, "cod_municipio", end.cod_municipio)
