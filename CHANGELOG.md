@@ -2,6 +2,7 @@
 
 ## 0.2.71
 - fix: #53 — agora_brt() preserva tzinfo BRT; corrige comparacoes naive/aware
+- fix: #54 — normalizar complemento no _salvar_ini e truncar a 60 chars no emitir
 
 ## 0.2.70
 - fix: #50 #51 #52 — indicador_destino, indicador_ie e CFOP automaticos por UF

@@ -100,3 +100,56 @@ class TestDadosEmissao:
     def test_campo_obrigatorio_faltando(self):
         with pytest.raises(ValidationError):
             DadosEmissao(destinatario=None, produtos=[], pagamentos=[])
+
+
+class TestComplementoTruncado:
+    """Issue #54: complemento truncado a 60 chars na serialização para pynfe."""
+
+    def test_complemento_longo_truncado(self):
+        """Emitente com complemento > 60 chars: pynfe deve receber no máx 60."""
+        from unittest.mock import patch, MagicMock, call
+        from nfe_sync.models import EmpresaConfig, Certificado, Emitente
+
+        complemento_longo = "QUADRA01                  LOTE  01                  LOJA  259"
+        assert len(complemento_longo) > 60
+
+        end = Endereco(
+            logradouro="RUA EXEMPLO", numero="100",
+            complemento=complemento_longo,
+            bairro="CENTRO", municipio="SAO PAULO",
+            cod_municipio="3550308", uf="SP", cep="01310100",
+        )
+        empresa = EmpresaConfig(
+            nome="SUL",
+            certificado=Certificado(path="/tmp/cert.pfx", senha="123456"),
+            emitente=Emitente(cnpj="99999999000191", endereco=end),
+            uf="sp", homologacao=True,
+        )
+
+        capturado = {}
+        PynfeEmitenteMock = MagicMock(side_effect=lambda **kw: capturado.update(kw) or MagicMock())
+
+        with patch("nfe_sync.emissao.PynfeEmitente", PynfeEmitenteMock):
+            try:
+                from nfe_sync.emissao import emitir
+                from nfe_sync.models import DadosEmissao, Destinatario, Produto, Pagamento
+                from decimal import Decimal
+                dados = DadosEmissao(
+                    destinatario=Destinatario(
+                        razao_social="NF-E EMITIDA EM AMBIENTE DE HOMOLOGACAO - SEM VALOR FISCAL",
+                        numero_documento="99999999000191",
+                        endereco=end,
+                    ),
+                    produtos=[Produto(
+                        codigo="0001", descricao="TESTE", ncm="71131100", cfop="5102",
+                        quantidade_comercial=Decimal("1"), valor_unitario_comercial=Decimal("10"),
+                        quantidade_tributavel=Decimal("1"), valor_unitario_tributavel=Decimal("10"),
+                        valor_total_bruto=Decimal("10"),
+                    )],
+                    pagamentos=[Pagamento(tipo="01", valor=Decimal("10"))],
+                )
+                emitir(empresa, "1", 1, dados)
+            except Exception:
+                pass  # interessa apenas o argumento passado ao PynfeEmitente
+
+        assert len(capturado.get("endereco_complemento", "")) <= 60

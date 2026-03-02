@@ -31,7 +31,7 @@ def emitir(empresa: EmpresaConfig, serie: str, numero_nf: int, dados: DadosEmiss
         codigo_de_regime_tributario=emi.regime_tributario,
         endereco_logradouro=end.logradouro,
         endereco_numero=end.numero,
-        endereco_complemento=end.complemento,
+        endereco_complemento=end.complemento[:60],
         endereco_bairro=end.bairro,
         endereco_municipio=end.municipio,
         endereco_cod_municipio=end.cod_municipio,
