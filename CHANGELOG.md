@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.91
+- fix: consultar-nsu usa state file original (.state.json) em TestFluxoCompleto
+
+## 0.2.90
+- feat: adicionar consultar-nsu com state file isolado em TestFluxoCompleto (etapas 7 e 8)
+
+## 0.2.89
+- fix: remover consultar-nsu de TestFluxoCompleto — nao faz parte do fluxo de NF-e
+
+## 0.2.88
+- fix: #87 — tolerar cooldown local (BLOQUEADO) em testes consultar-nsu E2E
+
+## 0.2.87
+- fix: #88 #89 #90 — remover fail redundante, acoplar nsu_emitente ao fluxo, precisar asserts cStat
+
 ## 0.2.86
 - feat: #85 — teste E2E fluxo completo emissao-consulta-manifestacao-cancelamento
 

@@ -46,23 +46,19 @@ class TestFluxoCompleto:
         """Etapa 2: EMITENTE consulta a NF-e emitida — deve estar autorizada (cStat=100)."""
         result = run_nfe("consultar", emitente, nf_fluxo["chave"])
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert "100" in result.stdout
+        assert re.search(r"cStat=100\b", result.stdout), f"cStat=100 nao encontrado:\n{result.stdout}"
 
     def test_consultar_destinatario(self, nf_fluxo, destinatario):
         """Etapa 3: DESTINATARIO consulta a mesma NF-e — deve estar autorizada (cStat=100)."""
-        if destinatario is None:
-            pytest.fail("--destinatario e obrigatorio para TestFluxoCompleto")
         result = run_nfe("consultar", destinatario, nf_fluxo["chave"])
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert "100" in result.stdout
+        assert re.search(r"cStat=100\b", result.stdout), f"cStat=100 nao encontrado:\n{result.stdout}"
 
     def test_manifestar_ciencia(self, nf_fluxo, destinatario):
         """Etapa 4: DESTINATARIO manifesta ciência da operação."""
-        if destinatario is None:
-            pytest.fail("--destinatario e obrigatorio para TestFluxoCompleto")
         result = run_nfe("manifestar", destinatario, "ciencia", nf_fluxo["chave"])
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert "135" in result.stdout or "136" in result.stdout
+        assert re.search(r"cStat=13[56]\b", result.stdout), f"cStat=135/136 nao encontrado:\n{result.stdout}"
 
     def test_cancelar(self, nf_fluxo, emitente):
         """Etapa 5: EMITENTE cancela a NF-e."""
@@ -72,24 +68,24 @@ class TestFluxoCompleto:
             "--justificativa", "Cancelamento de NF-e de teste E2E fluxo completo",
         )
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert "135" in result.stdout or "136" in result.stdout
+        assert re.search(r"cStat=13[56]\b", result.stdout), f"cStat=135/136 nao encontrado:\n{result.stdout}"
 
     def test_consultar_cancelada(self, nf_fluxo, emitente):
         """Etapa 6: EMITENTE confirma que a NF-e está cancelada (cStat=101)."""
         result = run_nfe("consultar", emitente, nf_fluxo["chave"])
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-        assert "101" in result.stdout
+        assert re.search(r"cStat=101\b", result.stdout), f"cStat=101 nao encontrado:\n{result.stdout}"
 
-    def test_consultar_nsu_emitente(self, emitente):
-        """Etapa 7: EMITENTE sincroniza via distribuição DFe. Skip se rate limit (656)."""
+    def test_consultar_nsu_emitente(self, nf_fluxo, emitente):
+        """Etapa 7: EMITENTE sincroniza via distribuição DFe."""
         result = run_nfe("consultar-nsu", emitente)
-        if "656" in result.stdout:
-            pytest.skip("SEFAZ rate limit (cStat=656) — tente novamente apos 1 hora")
+        if "656" in result.stdout or "BLOQUEADO" in result.stdout:
+            pytest.skip("SEFAZ rate limit ou cooldown ativo — tente novamente apos 1 hora")
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
 
     def test_consultar_nsu_destinatario(self, nf_fluxo, destinatario):
-        """Etapa 8: DESTINATARIO sincroniza via distribuição DFe. Skip se rate limit (656)."""
+        """Etapa 8: DESTINATARIO sincroniza via distribuição DFe."""
         result = run_nfe("consultar-nsu", destinatario)
-        if "656" in result.stdout:
-            pytest.skip("SEFAZ rate limit (cStat=656) — tente novamente apos 1 hora")
+        if "656" in result.stdout or "BLOQUEADO" in result.stdout:
+            pytest.skip("SEFAZ rate limit ou cooldown ativo — tente novamente apos 1 hora")
         assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"

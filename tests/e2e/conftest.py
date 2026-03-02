@@ -52,11 +52,12 @@ def serie(request):
     return request.config.getoption("--serie")
 
 
-def run_nfe(*args, homologacao=True, cwd=None, timeout=30) -> subprocess.CompletedProcess:
+def run_nfe(*args, homologacao=True, cwd=None, timeout=30, env=None) -> subprocess.CompletedProcess:
     """Executa o CLI nfe-sync com os argumentos fornecidos.
 
     homologacao=True (padrão) injeta --homologacao antes do subcomando,
     garantindo que os testes nunca rodem contra produção (#64).
+    env permite sobrescrever variáveis de ambiente (ex: NFE_SYNC_STATE).
     """
     flags = ["--homologacao"] if homologacao else []
     cmd = [sys.executable, "-m", "nfe_sync.cli"] + flags + list(args)
@@ -66,6 +67,7 @@ def run_nfe(*args, homologacao=True, cwd=None, timeout=30) -> subprocess.Complet
         text=True,
         cwd=cwd or os.getcwd(),
         timeout=timeout,
+        env=env,
     )
 
 
