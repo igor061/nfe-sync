@@ -1,10 +1,11 @@
 [Unit]
-Description=nfe-sync DROCER de hora em hora (SEFAZ exige 1h entre consultas sem novidade)
+Description=nfe-sync DROCER a cada 61 min (SEFAZ exige 1h entre consultas sem novidade)
 
 [Timer]
-OnCalendar=*-*-* *:17:00
-RandomizedDelaySec=120
-Persistent=true
+# Relativo ao fim da ultima rodada: o nfe-sync grava cooldown de 1h apos cStat 137,
+# entao horario fixo (*:17) caia dentro do cooldown e falhava uma rodada sim, outra nao.
+OnBootSec=5min
+OnUnitInactiveSec=61min
 
 [Install]
 WantedBy=timers.target
