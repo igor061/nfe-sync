@@ -211,3 +211,44 @@ def test_resumo_promovido_a_completa(db, tmp_path):
     c = rodar.gravar(_pasta(tmp_path, "nfeproc.xml"), CNPJ, db)
     assert c["gravado"] == 1
     assert _consulta(db, "select tipo, numero, cstat from nfe.documentos") == [("completa", 25416, "100")]
+
+
+# ---------- AC4: arquivo ruim nao bloqueia os demais ----------
+
+RES_SEM_CHAVE = ('<?xml version="1.0"?><resNFe xmlns="http://www.portalfiscal.inf.br/nfe" versao="1.01">'
+                 "<CNPJ>1</CNPJ><vNF>1.00</vNF></resNFe>")
+
+
+def _pasta_com_ruins(tmp_path):
+    # ruins ordenam antes e depois dos bons, para provar que nada aborta a rodada
+    p = _pasta(tmp_path, "nfeproc.xml", "resnfe.xml", "resevento.xml")
+    (p / "000-quebrado.xml").write_text("<resNFe><nao fecha", encoding="utf-8")
+    (p / "001-sem-chave.xml").write_text(RES_SEM_CHAVE, encoding="utf-8")
+    (p / "zzz-quebrado.xml").write_text("nem e xml", encoding="utf-8")
+    return p
+
+
+def test_gravar_arquivo_ruim_nao_impede_os_demais(db, tmp_path, capsys):
+    c = rodar.gravar(_pasta_com_ruins(tmp_path), CNPJ, db)
+    assert c["erro"] == 3
+    assert c["gravado"] == 3 and c["documento"] == 2 and c["evento"] == 1
+    assert _consulta(db, "select count(*) from nfe.documentos") == [(2,)]
+    assert _consulta(db, "select count(*) from nfe.eventos") == [(1,)]
+    out = capsys.readouterr().out
+    for nome in ("000-quebrado.xml", "001-sem-chave.xml", "zzz-quebrado.xml"):
+        assert nome in out
+
+
+def test_gravar_sem_erro_contabiliza_zero(db, tmp_path):
+    c = rodar.gravar(_pasta(tmp_path, "nfeproc.xml"), CNPJ, db)
+    assert c["erro"] == 0
+
+
+@pytest.mark.parametrize("rc,erro,esperado", [(0, 1, 1), (0, 0, 0), (7, 1, 7), (3, 0, 3)])
+def test_main_exit_code_considera_erros_de_arquivo(ambiente, monkeypatch, rc, erro, esperado):
+    cap = {}
+    _roda(monkeypatch, rc, cap, [])
+    monkeypatch.setattr(rodar, "gravar", lambda *a: {"erro": erro})
+    with pytest.raises(SystemExit) as e:
+        rodar.main()
+    assert e.value.code == esperado
