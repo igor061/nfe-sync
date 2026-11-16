@@ -3,6 +3,7 @@
 Nunca manifesta ciencia: o prompt [s/N] do consultar-nsu recebe stdin vazio (= nao).
 """
 import base64
+import fcntl
 import json
 import os
 import re
@@ -160,11 +161,43 @@ def processar_pedidos_ciencia(empresa: str, cnpj: str, dados: Path, env: dict, d
     return cont
 
 
+def baixar_completas_pedidas(empresa: str, cnpj: str, dados: Path, env: dict, db_url: str) -> int:
+    """Logo apos a ciencia a SEFAZ ja entrega o procNFe pela chave (medido: ~1 min).
+    Busca por chave so as notas com ciencia feita nas ultimas 2 h que ainda estao como resumo;
+    depois disso a distribuicao normal (de hora em hora) traz o XML, sem martelar a SEFAZ."""
+    with psycopg.connect(db_url, autocommit=True) as con:
+        chaves = [r[0] for r in con.execute(
+            "select p.chave from nfe.pedidos_ciencia p join nfe.documentos d using (cnpj_interessado, chave) "
+            "where p.cnpj_interessado = %s and p.status = 'feito' and d.tipo = 'resumo' "
+            "and p.processado_em > now() - interval '2 hours'", (cnpj,))]
+    for chave in chaves:
+        subprocess.run([sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa, "--chave", chave],
+                       cwd=dados, env=env, stdin=subprocess.DEVNULL)
+    return len(chaves)
+
+
+def ha_pedidos_a_fazer(cnpj: str, db_url: str) -> bool:
+    """Modo 'pedidos' roda a cada 2 min: sem trabalho, sai sem tocar no Infisical nem na SEFAZ."""
+    with psycopg.connect(db_url, autocommit=True) as con:
+        return con.execute(
+            "select exists (select 1 from nfe.pedidos_ciencia p join nfe.documentos d using (cnpj_interessado, chave) "
+            "where p.cnpj_interessado = %s and (p.status = 'pendente' or (p.status = 'feito' and d.tipo = 'resumo' "
+            "and p.processado_em > now() - interval '2 hours')))", (cnpj,)).fetchone()[0]
+
+
 def main():
     empresa, cnpj, uf = os.environ["NFE_EMPRESA"], os.environ["NFE_CNPJ"], os.environ["NFE_UF"]
     dados = Path(os.environ.get("NFE_DATA_DIR", "/data"))
+    # NFE_MODO=pedidos: so atende pedidos da UI (ciencia + XML pela chave), sem a consulta por NSU.
+    so_pedidos = os.environ.get("NFE_MODO") == "pedidos"
+    if so_pedidos and not ha_pedidos_a_fazer(cnpj, os.environ["NFE_DB_URL"]):
+        sys.exit(0)
     # Filial usa o certificado da matriz (mesma raiz de CNPJ): NFE_CERT aponta o prefixo no Infisical.
     pfx, senha = buscar_certificado(os.environ.get("NFE_CERT", empresa))
+    # Uma rodada por empresa de cada vez (rodada de hora em hora x gatilho de pedidos): mesmo .state.json/downloads.
+    dados.mkdir(parents=True, exist_ok=True)
+    trava = open(dados / ".lock", "w")
+    fcntl.flock(trava, fcntl.LOCK_EX)
     with tempfile.TemporaryDirectory() as tmp:
         cert = Path(tmp, "cert.pfx")
         cert.write_bytes(pfx)
@@ -175,8 +208,12 @@ def main():
         pedidos = processar_pedidos_ciencia(empresa, cnpj, dados, env, os.environ["NFE_DB_URL"])
         if any(pedidos.values()):
             print(f"Pedidos de ciencia: {pedidos}", flush=True)
-        rc = subprocess.run([sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa],
-                            cwd=dados, env=env, stdin=subprocess.DEVNULL).returncode
+        baixadas = baixar_completas_pedidas(empresa, cnpj, dados, env, os.environ["NFE_DB_URL"])
+        if baixadas:
+            print(f"XML completo pedido pela chave: {baixadas}", flush=True)
+        rc = 0 if so_pedidos else subprocess.run(
+            [sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa],
+            cwd=dados, env=env, stdin=subprocess.DEVNULL).returncode
     cont = gravar(dados / "downloads" / cnpj, cnpj, os.environ["NFE_DB_URL"])
     print(f"Banco: {cont}", flush=True)
     sys.exit(rc or (1 if cont.get("erro") else 0))

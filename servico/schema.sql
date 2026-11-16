@@ -50,3 +50,13 @@ create table if not exists nfe.pedidos_ciencia (
     processado_em    timestamptz,
     primary key (cnpj_interessado, chave)
 );
+
+-- Gatilho: pedido pendente novo (ou reaberto) avisa o servico na hora (LISTEN nfe_pedidos_ciencia).
+create or replace function nfe.avisar_pedido_ciencia() returns trigger language plpgsql as $$
+begin
+    perform pg_notify('nfe_pedidos_ciencia', new.cnpj_interessado);
+    return new;
+end $$;
+drop trigger if exists avisar_pedido_ciencia on nfe.pedidos_ciencia;
+create trigger avisar_pedido_ciencia after insert or update of status on nfe.pedidos_ciencia
+    for each row when (new.status = 'pendente') execute function nfe.avisar_pedido_ciencia();

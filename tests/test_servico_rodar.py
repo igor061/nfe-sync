@@ -99,6 +99,7 @@ def ambiente(tmp_path, monkeypatch):
         monkeypatch.setenv(k, v)
     monkeypatch.setattr(rodar, "buscar_certificado", lambda nome: (b"PFXBYTES", "segredo"))
     monkeypatch.setattr(rodar, "processar_pedidos_ciencia", lambda *a: {"feito": 0, "erro": 0})
+    monkeypatch.setattr(rodar, "baixar_completas_pedidas", lambda *a: 0)
     return dados
 
 
@@ -343,3 +344,111 @@ def test_ciencia_usa_cstat_do_evento_e_nao_o_do_lote(db, monkeypatch, tmp_path):
     st = {r[0]: (r[1], r[2], r[3]) for r in _consulta(db, "select chave, status, cstat, mensagem from nfe.pedidos_ciencia")}
     assert st[k_ok] == ("feito", "135", "Evento registrado e vinculado a NF-e")
     assert st[k_rej] == ("erro", "650", "Rejeicao: NF-e cancelada")
+
+
+
+# ---------- AC7: XML completo logo apos a ciencia + modo 'pedidos' ----------
+
+def _doc(db, chave, tipo="resumo", cnpj=CNPJ):
+    import psycopg
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("insert into nfe.documentos (cnpj_interessado, chave, tipo, arquivo, xml) values (%s,%s,%s,'a','<x/>')",
+                    (cnpj, chave, tipo))
+
+
+def test_baixa_pela_chave_so_ciencia_feita_recente_e_ainda_resumo(db, monkeypatch, tmp_path):
+    import psycopg
+    k_sim, k_ja_completa, k_antiga, k_pendente = "1" * 44, "2" * 44, "3" * 44, "4" * 44
+    for k in (k_sim, k_antiga, k_pendente):
+        _doc(db, k)
+    _doc(db, k_ja_completa, tipo="completa")
+    for k in (k_sim, k_ja_completa, k_antiga):
+        _pedido(db, k, status="feito")
+    _pedido(db, k_pendente)
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("update nfe.pedidos_ciencia set processado_em = now()")
+        con.execute("update nfe.pedidos_ciencia set processado_em = now() - interval '3 hours' where chave = %s", (k_antiga,))
+        con.execute("update nfe.pedidos_ciencia set processado_em = null where status = 'pendente'")
+    chamadas = []
+    monkeypatch.setattr(rodar.subprocess, "run", lambda cmd, **kw: chamadas.append((cmd, kw)) or subprocess.CompletedProcess(cmd, 0))
+    assert rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db) == 1
+    cmd, kw = chamadas[0]
+    assert cmd[-4:] == ["consultar-nsu", "DROCER", "--chave", k_sim] and "--producao" in cmd
+    assert kw["stdin"] is subprocess.DEVNULL
+
+
+def test_ha_pedidos_a_fazer(db):
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+    _doc(db, "5" * 44); _pedido(db, "5" * 44)
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is True
+    assert rodar.ha_pedidos_a_fazer("99999999000199", db) is False
+
+
+def test_modo_pedidos_sem_trabalho_nao_toca_infisical_nem_sefaz(ambiente, monkeypatch):
+    monkeypatch.setenv("NFE_MODO", "pedidos")
+    monkeypatch.setattr(rodar, "ha_pedidos_a_fazer", lambda *a: False)
+    monkeypatch.setattr(rodar, "buscar_certificado", lambda *a: pytest.fail("nao devia buscar certificado"))
+    monkeypatch.setattr(rodar.subprocess, "run", lambda *a, **k: pytest.fail("nao devia chamar o nfe-sync"))
+    with pytest.raises(SystemExit) as e:
+        rodar.main()
+    assert e.value.code == 0
+
+
+def test_modo_pedidos_com_trabalho_nao_consulta_por_nsu(ambiente, monkeypatch):
+    monkeypatch.setenv("NFE_MODO", "pedidos")
+    monkeypatch.setattr(rodar, "ha_pedidos_a_fazer", lambda *a: True)
+    ordem = []
+    monkeypatch.setattr(rodar, "processar_pedidos_ciencia", lambda *a: ordem.append("ciencia") or {"feito": 1, "erro": 0})
+    monkeypatch.setattr(rodar, "baixar_completas_pedidas", lambda *a: ordem.append("chave") or 1)
+    monkeypatch.setattr(rodar.subprocess, "run", lambda cmd, **kw: ordem.append("nsu") or subprocess.CompletedProcess(cmd, 0))
+    monkeypatch.setattr(rodar, "gravar", lambda *a: ordem.append("gravar") or {})
+    with pytest.raises(SystemExit) as e:
+        rodar.main()
+    assert ordem == ["ciencia", "chave", "gravar"] and e.value.code == 0
+
+
+# ---------- AC8: gatilho (LISTEN/NOTIFY) ----------
+
+sys.path.insert(0, str(RAIZ / "servico"))
+import gatilho  # noqa: E402
+
+
+def test_trigger_avisa_so_pedido_pendente(db):
+    import psycopg
+    k = "9" * 44
+    _doc(db, k)
+    with psycopg.connect(db, autocommit=True) as ouvinte, psycopg.connect(db, autocommit=True) as app:
+        ouvinte.execute("listen nfe_pedidos_ciencia")
+        app.execute("insert into nfe.pedidos_ciencia (cnpj_interessado, chave, solicitado_por) values (%s,%s,'ui')", (CNPJ, k))
+        assert [n.payload for n in ouvinte.notifies(timeout=2, stop_after=1)] == [CNPJ]
+        app.execute("update nfe.pedidos_ciencia set status='feito'")
+        assert list(ouvinte.notifies(timeout=1)) == []          # processado: nao avisa
+        app.execute("update nfe.pedidos_ciencia set status='pendente'")
+        assert [n.payload for n in ouvinte.notifies(timeout=2, stop_after=1)] == [CNPJ]  # reaberto: avisa
+
+
+def test_atender_roda_modo_pedidos_so_das_instancias_do_cnpj(tmp_path, monkeypatch):
+    emp = tmp_path / "empresas"; emp.mkdir()
+    (emp / "SRJK.env").write_text("NFE_EMPRESA=SRJK\nNFE_CERT=SRJK\nNFE_CNPJ=18816825000144\nNFE_UF=df\n")
+    (emp / "SRJK2.env").write_text("# filial\nNFE_EMPRESA=SRJK2\nNFE_CERT=SRJK\nNFE_CNPJ=18816825000225\nNFE_UF=df\n")
+    (emp / "DROCER.env").write_text(f"NFE_EMPRESA=DROCER\nNFE_CNPJ={CNPJ}\nNFE_UF=df\n")
+    chamadas = []
+    monkeypatch.setattr(gatilho.subprocess, "run", lambda cmd, **kw: chamadas.append((cmd, kw)))
+    assert gatilho.atender("18816825000225", emp, tmp_path / "dados") == ["SRJK2"]
+    cmd, kw = chamadas[0]
+    assert cmd[-1].endswith("rodar.py")
+    assert kw["env"]["NFE_MODO"] == "pedidos" and kw["env"]["NFE_EMPRESA"] == "SRJK2" and kw["env"]["NFE_CERT"] == "SRJK"
+    assert kw["env"]["NFE_DATA_DIR"] == str(tmp_path / "dados" / "SRJK2")
+    assert kw["stdin"] is subprocess.DEVNULL
+    chamadas.clear()
+    assert gatilho.atender(None, emp, tmp_path / "dados") == ["DROCER", "SRJK", "SRJK2"]   # varredura
+
+
+def test_main_trava_por_empresa(ambiente, monkeypatch):
+    travas = []
+    monkeypatch.setattr(rodar.fcntl, "flock", lambda f, op: travas.append((Path(f.name).name, op)))
+    cap, grav = {}, []
+    _roda(monkeypatch, 0, cap, grav)
+    with pytest.raises(SystemExit):
+        rodar.main()
+    assert travas == [(".lock", rodar.fcntl.LOCK_EX)]
