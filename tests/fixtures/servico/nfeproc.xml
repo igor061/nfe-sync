@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe" versao="4.00">
+  <NFe xmlns="http://www.portalfiscal.inf.br/nfe">
+    <infNFe Id="NFe35261172677370000179550010000254161000124160" versao="4.00">
+      <ide>
+        <cUF>35</cUF>
+        <cNF>00012416</cNF>
+        <natOp>REMESSA EM BONIFICACAO, DOACAO E BRINDE</natOp>
+        <mod>55</mod>
+        <serie>1</serie>
+        <nNF>25416</nNF>
+        <dhEmi>2026-11-05T14:51:00-03:00</dhEmi>
+        <tpNF>1</tpNF>
+        <idDest>2</idDest>
+        <cMunFG>3526902</cMunFG>
+        <tpImp>1</tpImp>
+        <tpEmis>1</tpEmis>
+        <cDV>0</cDV>
+        <tpAmb>1</tpAmb>
+        <finNFe>1</finNFe>
+        <indFinal>1</indFinal>
+        <indPres>0</indPres>
+        <procEmi>0</procEmi>
+        <verProc>_ver.</verProc>
+      </ide>
+      <emit>
+        <CNPJ>72677370000179</CNPJ>
+        <xNome>REAL GOLD INDUSTRIA E COMERCIO EIRELI</xNome>
+        <xFant>REAL GOLD LTDA</xFant>
+        <enderEmit>
+          <xLgr>R ARAUCARIA</xLgr>
+          <nro>697</nro>
+          <xBairro>CENTRO INDUSTRIAL DE LIMEIRA - CIL</xBairro>
+          <cMun>3526902</cMun>
+          <xMun>LIMEIRA</xMun>
+          <UF>SP</UF>
+          <CEP>13481210</CEP>
+          <cPais>1058</cPais>
+          <xPais>BRASIL</xPais>
+          <fone>1934953125</fone>
+        </enderEmit>
+        <IE>417119152110</IE>
+        <CRT>1</CRT>
+      </emit>
+      <dest>
+        <CNPJ>05381344000101</CNPJ>
+        <xNome>DROCER JOIAS LTDA</xNome>
+        <enderDest>
+          <xLgr>SC/NORTE QUADRA 05</xLgr>
+          <nro>172-C</nro>
+          <xCpl>BLOCO A</xCpl>
+          <xBairro>ASA NORTE</xBairro>
+          <cMun>5300108</cMun>
+          <xMun>BRASILIA</xMun>
+          <UF>DF</UF>
+          <CEP>70715000</CEP>
+          <cPais>1058</cPais>
+          <xPais>BRASIL</xPais>
+          <fone>6133262335</fone>
+        </enderDest>
+        <indIEDest>1</indIEDest>
+        <IE>0743983500124</IE>
+        <email>coralli@coralli.com.br</email>
+      </dest>
+      <det nItem="1">
+        <prod>
+          <cProd>A1001</cProd>
+          <cEAN>SEM GTIN</cEAN>
+          <xProd>ANEIS DIVERSOS AG FOLHEADO AU</xProd>
+          <NCM>71131100</NCM>
+          <CFOP>6910</CFOP>
+          <uCom>PC</uCom>
+          <qCom>1.0000</qCom>
+          <vUnCom>43.400000</vUnCom>
+          <vProd>43.40</vProd>
+          <cEANTrib>SEM GTIN</cEANTrib>
+          <uTrib>PC</uTrib>
+          <qTrib>1.0000</qTrib>
+          <vUnTrib>43.400000</vUnTrib>
+          <indTot>1</indTot>
+        </prod>
+        <imposto>
+          <ICMS>
+            <ICMSSN102>
+              <orig>0</orig>
+              <CSOSN>102</CSOSN>
+            </ICMSSN102>
+          </ICMS>
+          <IPI>
+            <cEnq>999</cEnq>
+            <IPITrib>
+              <CST>00</CST>
+              <vBC>0.00</vBC>
+              <pIPI>0.00</pIPI>
+              <vIPI>0.00</vIPI>
+            </IPITrib>
+          </IPI>
+          <PIS>
+            <PISOutr>
+              <CST>99</CST>
+              <vBC>0.00</vBC>
+              <pPIS>0.00</pPIS>
+              <vPIS>0.00</vPIS>
+            </PISOutr>
+          </PIS>
+          <COFINS>
+            <COFINSOutr>
+              <CST>99</CST>
+              <vBC>0.00</vBC>
+              <pCOFINS>0.00</pCOFINS>
+              <vCOFINS>0.00</vCOFINS>
+            </COFINSOutr>
+          </COFINS>
+        </imposto>
+      </det>
+      <total>
+        <ICMSTot>
+          <vBC>0.00</vBC>
+          <vICMS>0.00</vICMS>
+          <vICMSDeson>0.00</vICMSDeson>
+          <vFCP>0.00</vFCP>
+          <vBCST>0.00</vBCST>
+          <vST>0.00</vST>
+          <vFCPST>0.00</vFCPST>
+          <vFCPSTRet>0.00</vFCPSTRet>
+          <vProd>43.40</vProd>
+          <vFrete>0.00</vFrete>
+          <vSeg>0.00</vSeg>
+          <vDesc>0.00</vDesc>
+          <vII>0.00</vII>
+          <vIPI>0.00</vIPI>
+          <vIPIDevol>0.00</vIPIDevol>
+          <vPIS>0.00</vPIS>
+          <vCOFINS>0.00</vCOFINS>
+          <vOutro>0.00</vOutro>
+          <vNF>43.40</vNF>
+        </ICMSTot>
+      </total>
+      <transp>
+        <modFrete>9</modFrete>
+      </transp>
+      <pag>
+        <detPag>
+          <indPag>0</indPag>
+          <tPag>90</tPag>
+          <vPag>0.00</vPag>
+        </detPag>
+      </pag>
+      <infAdic>
+        <infCpl>Regime tributario: Simples Nacional REMESSA DE BRINDE</infCpl>
+      </infAdic>
+    </infNFe>
+    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+      <SignedInfo>
+        <CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+        <SignatureMethod Algorithm="http://www.w3.org/2000/09/xmldsig#rsa-sha1"/>
+        <Reference URI="#NFe35261172677370000179550010000254161000124160">
+          <Transforms>
+            <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+            <Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/>
+          </Transforms>
+          <DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha1"/>
+          <DigestValue>e6uHtzp/gDvCe5u0IeLHVAS1ADQ=</DigestValue>
+        </Reference>
+      </SignedInfo>
+      <SignatureValue>kGM/9z6G2BMq60ikgFMu/ZYuJtlCtGCJZmbBV+kLzS5Z1NivgbI+3S4U6RGLEeh10ElkVPEuqPoLu7Xu8nJmYkq+JGIXcYMyt3CbJqaXE8WQEWSXblKNLIcXPBOBdDVnyBd5Zm9OdicSdsw1cR9PXXYn5JMAtSAjeW1tMQJxTKiR1F2cZbbgtXrKPZC/JbtNDzRc9RdhlFgpxKThWGCanozzT0ytXpHYC6jpeCJ1GWvLPPz7Y28Pp4uZYFLMVkTOuPUuG1oq2hdrxiEmedk+uHYE7qr00Ux8SZXntjzPVVNCjE0lEUPzK4ddcqn2bLpWxzNy49cYV00qA6WYNS88BA==</SignatureValue>
+      <KeyInfo>
+        <X509Data>
+          <X509Certificate>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</X509Certificate>
+        </X509Data>
+      </KeyInfo>
+    </Signature>
+  </NFe>
+  <protNFe versao="4.00">
+    <infProt Id="Id135264730464381">
+      <tpAmb>1</tpAmb>
+      <verAplic>SP_NFE_PL009_V4</verAplic>
+      <chNFe>35261172677370000179550010000254161000124160</chNFe>
+      <dhRecbto>2026-11-05T14:51:21-03:00</dhRecbto>
+      <nProt>135264730464381</nProt>
+      <digVal>e6uHtzp/gDvCe5u0IeLHVAS1ADQ=</digVal>
+      <cStat>100</cStat>
+      <xMotivo>Autorizado o uso da NF-e</xMotivo>
+    </infProt>
+  </protNFe>
+</nfeProc>
