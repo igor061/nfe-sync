@@ -5,6 +5,7 @@ Nunca manifesta ciencia: o prompt [s/N] do consultar-nsu recebe stdin vazio (= n
 import base64
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -128,6 +129,34 @@ def gravar(pasta: Path, cnpj: str, db_url: str) -> dict:
     return cont
 
 
+# cStat do evento de ciencia: 135/136 registrado; 573 ja existia (duplicidade) — ambos = feito.
+_CIENCIA_OK = {"135", "136", "573"}
+
+
+def processar_pedidos_ciencia(empresa: str, cnpj: str, dados: Path, env: dict, db_url: str) -> dict:
+    """Registra a ciencia SO das chaves pedidas pela UI (status 'pendente') desta empresa."""
+    cont = {"feito": 0, "erro": 0}
+    with psycopg.connect(db_url, autocommit=True) as con:
+        pendentes = [r[0] for r in con.execute(
+            "select chave from nfe.pedidos_ciencia where cnpj_interessado = %s and status = 'pendente' "
+            "order by solicitado_em", (cnpj,))]
+        for chave in pendentes:
+            proc = subprocess.run(
+                [sys.executable, "-m", "nfe_sync.cli", "--producao", "manifestar", empresa, "ciencia", chave],
+                cwd=dados, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+            saida = proc.stdout + proc.stderr
+            print(saida, end="", flush=True)
+            m = re.search(r"cStat=(\d+)\s+(.*)", saida)
+            cstat, motivo = (m.group(1), m.group(2).strip()) if m else (None, saida.strip()[-300:])
+            status = "feito" if cstat in _CIENCIA_OK else "erro"
+            cont[status] += 1
+            con.execute(
+                "update nfe.pedidos_ciencia set status = %s, cstat = %s, mensagem = %s, processado_em = now() "
+                "where cnpj_interessado = %s and chave = %s and status = 'pendente'",
+                (status, cstat, motivo, cnpj, chave))
+    return cont
+
+
 def main():
     empresa, cnpj, uf = os.environ["NFE_EMPRESA"], os.environ["NFE_CNPJ"], os.environ["NFE_UF"]
     dados = Path(os.environ.get("NFE_DATA_DIR", "/data"))
@@ -140,6 +169,9 @@ def main():
         conf.write_text(f"[{empresa}]\npath = {cert}\nsenha = {senha.replace('%', '%%')}\nuf = {uf}\nhomologacao = false\ncnpj = {cnpj}\n")
         env = {**{k: v for k, v in os.environ.items() if k not in _SEGREDOS}, "NFE_SYNC_CONFIG": str(conf), "NFE_SYNC_STATE": str(dados / ".state.json"),
                "NFE_SYNC_LOG_DIR": str(dados / "log")}
+        pedidos = processar_pedidos_ciencia(empresa, cnpj, dados, env, os.environ["NFE_DB_URL"])
+        if any(pedidos.values()):
+            print(f"Pedidos de ciencia: {pedidos}", flush=True)
         rc = subprocess.run([sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa],
                             cwd=dados, env=env, stdin=subprocess.DEVNULL).returncode
     cont = gravar(dados / "downloads" / cnpj, cnpj, os.environ["NFE_DB_URL"])

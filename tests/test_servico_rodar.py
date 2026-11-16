@@ -98,6 +98,7 @@ def ambiente(tmp_path, monkeypatch):
                  "NFE_DATA_DIR": str(dados), "NFE_DB_URL": "postgresql://x"}.items():
         monkeypatch.setenv(k, v)
     monkeypatch.setattr(rodar, "buscar_certificado", lambda nome: (b"PFXBYTES", "segredo"))
+    monkeypatch.setattr(rodar, "processar_pedidos_ciencia", lambda *a: {"feito": 0, "erro": 0})
     return dados
 
 
@@ -272,3 +273,60 @@ def test_main_certificado_por_nfe_cert(ambiente, monkeypatch, cert_env, esperado
     assert pedidos == [esperado]
     assert cap["cmd"][-1] == "SRJK2"          # secao do ini / consulta = instancia (CNPJ da filial)
     assert "[SRJK2]" in cap["conf"]
+
+
+# ---------- AC6: pedidos de ciencia vindos da UI ----------
+
+def _pedido(db, chave, status="pendente", cnpj=CNPJ):
+    import psycopg
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("insert into nfe.pedidos_ciencia (cnpj_interessado, chave, solicitado_por, status) "
+                    "values (%s, %s, 'teste@x', %s)", (cnpj, chave, status))
+
+
+def _fake_manifestar(monkeypatch, saidas, chamadas):
+    def fake_run(cmd, **kw):
+        chamadas.append((cmd, kw))
+        return subprocess.CompletedProcess(cmd, 0, stdout=saidas[cmd[-1]], stderr="")
+    monkeypatch.setattr(rodar.subprocess, "run", fake_run)
+
+
+def test_ciencia_so_das_chaves_pedidas_e_pendentes(db, monkeypatch, tmp_path):
+    k_ok, k_dup, k_erro, k_feito, k_outra = ("1" * 44, "2" * 44, "3" * 44, "4" * 44, "5" * 44)
+    _pedido(db, k_ok); _pedido(db, k_dup); _pedido(db, k_erro)
+    _pedido(db, k_feito, status="feito")             # ja processado: nao repete
+    _pedido(db, k_outra, cnpj="99999999000199")      # outra empresa: nao e desta rodada
+    saidas = {k_ok: "  cStat=135  Evento registrado e vinculado a NF-e\n",
+              k_dup: "  cStat=573  Rejeicao: Duplicidade de evento\n",
+              k_erro: "  cStat=650  Rejeicao: NF-e cancelada\n"}
+    chamadas = []
+    _fake_manifestar(monkeypatch, saidas, chamadas)
+    cont = rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {"X": "1"}, db)
+    assert cont == {"feito": 2, "erro": 1}
+    chaves = [c[0][-1] for c in chamadas]
+    assert sorted(chaves) == sorted([k_ok, k_dup, k_erro])
+    for cmd, kw in chamadas:
+        assert cmd[-4:-1] == ["manifestar", "DROCER", "ciencia"] and "--producao" in cmd
+        assert kw["stdin"] is subprocess.DEVNULL
+    st = dict((r[0], (r[1], r[2])) for r in _consulta(db, "select chave, status, cstat from nfe.pedidos_ciencia"))
+    assert st[k_ok] == ("feito", "135") and st[k_dup] == ("feito", "573") and st[k_erro] == ("erro", "650")
+    assert st[k_feito] == ("feito", None) and st[k_outra] == ("pendente", None)
+
+
+def test_ciencia_saida_sem_cstat_vira_erro(db, monkeypatch, tmp_path):
+    k = "6" * 44
+    _pedido(db, k)
+    _fake_manifestar(monkeypatch, {k: "Traceback: certificado invalido"}, [])
+    assert rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db) == {"feito": 0, "erro": 1}
+    status, msg = _consulta(db, "select status, mensagem from nfe.pedidos_ciencia")[0]
+    assert status == "erro" and "certificado invalido" in msg
+
+
+def test_main_processa_pedidos_antes_de_consultar(ambiente, monkeypatch):
+    ordem = []
+    monkeypatch.setattr(rodar, "processar_pedidos_ciencia", lambda *a: ordem.append("ciencia") or {"feito": 0, "erro": 0})
+    monkeypatch.setattr(rodar.subprocess, "run", lambda cmd, **kw: ordem.append(cmd[4]) or subprocess.CompletedProcess(cmd, 0))
+    monkeypatch.setattr(rodar, "gravar", lambda *a: {})
+    with pytest.raises(SystemExit):
+        rodar.main()
+    assert ordem == ["ciencia", "consultar-nsu"]

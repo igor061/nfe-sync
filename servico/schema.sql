@@ -34,3 +34,19 @@ create table if not exists nfe.eventos (
     primary key (cnpj_interessado, arquivo)
 );
 create index if not exists eventos_chave_idx on nfe.eventos (chave);
+
+-- Pedidos de ciencia da operacao feitos pela UI (ranchoapp). O servico processa os
+-- 'pendente' da sua empresa no inicio de cada rodada; o XML completo chega depois
+-- pela distribuicao DFe normal. Nada e manifestado sem um pedido explicito.
+create table if not exists nfe.pedidos_ciencia (
+    cnpj_interessado char(14)    not null,
+    chave            char(44)    not null,
+    solicitado_por   text        not null,
+    solicitado_em    timestamptz not null default now(),
+    status           text        not null default 'pendente'
+                     check (status in ('pendente', 'feito', 'erro')),
+    cstat            text,
+    mensagem         text,
+    processado_em    timestamptz,
+    primary key (cnpj_interessado, chave)
+);
