@@ -132,19 +132,27 @@ def gravar(pasta: Path, cnpj: str, db_url: str) -> dict:
 
 # cStat do evento de ciencia: 135/136 registrado; 573 ja existia (duplicidade) — ambos = feito.
 _CIENCIA_OK = {"135", "136", "573"}
+MAX_BUSCAS = 3
+TIMEOUT_SEFAZ_S = 180
 
 
 def processar_pedidos_ciencia(empresa: str, cnpj: str, dados: Path, env: dict, db_url: str) -> dict:
     """Registra a ciencia SO das chaves pedidas pela UI (status 'pendente') desta empresa."""
     cont = {"feito": 0, "erro": 0}
     with psycopg.connect(db_url, autocommit=True) as con:
+        # Sem a nota como 'resumo' desta empresa no banco, nao manifesta: erro sem chamar a SEFAZ.
+        con.execute(
+            "update nfe.pedidos_ciencia p set status = 'erro', mensagem = 'Chave sem resumo desta empresa no banco', "
+            "processado_em = now() where p.cnpj_interessado = %s and p.status = 'pendente' and not exists ("
+            "select 1 from nfe.documentos d where d.cnpj_interessado = p.cnpj_interessado and d.chave = p.chave "
+            "and d.tipo = 'resumo')", (cnpj,))
         pendentes = [r[0] for r in con.execute(
             "select chave from nfe.pedidos_ciencia where cnpj_interessado = %s and status = 'pendente' "
             "order by solicitado_em", (cnpj,))]
         for chave in pendentes:
             proc = subprocess.run(
                 [sys.executable, "-m", "nfe_sync.cli", "--producao", "manifestar", empresa, "ciencia", chave],
-                cwd=dados, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True)
+                cwd=dados, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=TIMEOUT_SEFAZ_S)
             saida = proc.stdout + proc.stderr
             print(saida, end="", flush=True)
             # A resposta traz o cStat do lote (128) e o do evento (135/136/573/...): vale o do evento.
@@ -166,13 +174,21 @@ def baixar_completas_pedidas(empresa: str, cnpj: str, dados: Path, env: dict, db
     Busca por chave so as notas com ciencia feita nas ultimas 2 h que ainda estao como resumo;
     depois disso a distribuicao normal (de hora em hora) traz o XML, sem martelar a SEFAZ."""
     with psycopg.connect(db_url, autocommit=True) as con:
+        # Reserva a tentativa ANTES de chamar (no maximo MAX_BUSCAS por pedido, 5 min entre elas);
+        # processado_em no futuro nao conta (nao prolonga a janela).
         chaves = [r[0] for r in con.execute(
-            "select p.chave from nfe.pedidos_ciencia p join nfe.documentos d using (cnpj_interessado, chave) "
-            "where p.cnpj_interessado = %s and p.status = 'feito' and d.tipo = 'resumo' "
-            "and p.processado_em > now() - interval '2 hours'", (cnpj,))]
+            "update nfe.pedidos_ciencia p set buscas = p.buscas + 1, ultima_busca_em = now() "
+            "from nfe.documentos d where d.cnpj_interessado = p.cnpj_interessado and d.chave = p.chave "
+            "and p.cnpj_interessado = %s and p.status = 'feito' and d.tipo = 'resumo' "
+            "and p.processado_em between now() - interval '2 hours' and now() "
+            "and p.buscas < %s and (p.ultima_busca_em is null or p.ultima_busca_em < now() - interval '5 minutes') "
+            "returning p.chave", (cnpj, MAX_BUSCAS))]
     for chave in chaves:
-        subprocess.run([sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa, "--chave", chave],
-                       cwd=dados, env=env, stdin=subprocess.DEVNULL)
+        try:
+            subprocess.run([sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa, "--chave", chave],
+                           cwd=dados, env=env, stdin=subprocess.DEVNULL, timeout=TIMEOUT_SEFAZ_S)
+        except subprocess.TimeoutExpired:
+            print(f"busca pela chave {chave}: timeout", flush=True)
     return len(chaves)
 
 
@@ -182,7 +198,9 @@ def ha_pedidos_a_fazer(cnpj: str, db_url: str) -> bool:
         return con.execute(
             "select exists (select 1 from nfe.pedidos_ciencia p join nfe.documentos d using (cnpj_interessado, chave) "
             "where p.cnpj_interessado = %s and (p.status = 'pendente' or (p.status = 'feito' and d.tipo = 'resumo' "
-            "and p.processado_em > now() - interval '2 hours')))", (cnpj,)).fetchone()[0]
+            "and p.processado_em between now() - interval '2 hours' and now() and p.buscas < %s "
+            "and (p.ultima_busca_em is null or p.ultima_busca_em < now() - interval '5 minutes'))))",
+            (cnpj, MAX_BUSCAS)).fetchone()[0]
 
 
 def main():

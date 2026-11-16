@@ -278,9 +278,12 @@ def test_main_certificado_por_nfe_cert(ambiente, monkeypatch, cert_env, esperado
 
 # ---------- AC6: pedidos de ciencia vindos da UI ----------
 
-def _pedido(db, chave, status="pendente", cnpj=CNPJ):
+def _pedido(db, chave, status="pendente", cnpj=CNPJ, com_doc=True):
     import psycopg
     with psycopg.connect(db, autocommit=True) as con:
+        if com_doc:
+            con.execute("insert into nfe.documentos (cnpj_interessado, chave, tipo, arquivo, xml) "
+                        "values (%s,%s,'resumo','a','<x/>') on conflict do nothing", (cnpj, chave))
         con.execute("insert into nfe.pedidos_ciencia (cnpj_interessado, chave, solicitado_por, status) "
                     "values (%s, %s, 'teste@x', %s)", (cnpj, chave, status))
 
@@ -352,8 +355,8 @@ def test_ciencia_usa_cstat_do_evento_e_nao_o_do_lote(db, monkeypatch, tmp_path):
 def _doc(db, chave, tipo="resumo", cnpj=CNPJ):
     import psycopg
     with psycopg.connect(db, autocommit=True) as con:
-        con.execute("insert into nfe.documentos (cnpj_interessado, chave, tipo, arquivo, xml) values (%s,%s,%s,'a','<x/>')",
-                    (cnpj, chave, tipo))
+        con.execute("insert into nfe.documentos (cnpj_interessado, chave, tipo, arquivo, xml) values (%s,%s,%s,'a','<x/>') "
+                    "on conflict (cnpj_interessado, chave) do update set tipo = excluded.tipo", (cnpj, chave, tipo))
 
 
 def test_baixa_pela_chave_so_ciencia_feita_recente_e_ainda_resumo(db, monkeypatch, tmp_path):
@@ -463,7 +466,7 @@ def test_ler_env_ignora_comentario_e_vazio_e_preserva_igual_no_valor(tmp_path):
 
 
 def test_ciencia_passa_env_e_cwd_do_chamador(db, monkeypatch, tmp_path):
-    k = "a" * 44
+    k = "60" * 22
     _pedido(db, k)
     chamadas = []
     _fake_manifestar(monkeypatch, {k: "cStat=135  ok\n"}, chamadas)
@@ -472,7 +475,7 @@ def test_ciencia_passa_env_e_cwd_do_chamador(db, monkeypatch, tmp_path):
 
 
 def test_ciencia_so_lote_128_vira_erro_com_cstat_e_motivo(db, monkeypatch, tmp_path):
-    k = "b" * 44
+    k = "61" * 22
     _pedido(db, k)
     _fake_manifestar(monkeypatch, {k: "cStat=128  Lote de evento processado\n"}, [])
     assert rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db) == {"feito": 0, "erro": 1}
@@ -481,7 +484,7 @@ def test_ciencia_so_lote_128_vira_erro_com_cstat_e_motivo(db, monkeypatch, tmp_p
 
 
 def test_ciencia_feito_nao_repete_na_segunda_rodada(db, monkeypatch, tmp_path):
-    k = "c" * 44
+    k = "62" * 22
     _pedido(db, k)
     chamadas = []
     _fake_manifestar(monkeypatch, {k: "cStat=135  ok\n"}, chamadas)
@@ -491,7 +494,7 @@ def test_ciencia_feito_nao_repete_na_segunda_rodada(db, monkeypatch, tmp_path):
 
 
 def test_baixa_pela_chave_ignora_outro_cnpj(db, monkeypatch, tmp_path):
-    k = "d" * 44
+    k = "63" * 22
     _doc(db, k, cnpj="99999999000199"); _pedido(db, k, status="feito", cnpj="99999999000199")
     import psycopg
     with psycopg.connect(db, autocommit=True) as con:
@@ -503,12 +506,12 @@ def test_baixa_pela_chave_ignora_outro_cnpj(db, monkeypatch, tmp_path):
 
 def test_ha_pedidos_feito_antigo_ou_ja_completa_nao_conta(db):
     import psycopg
-    for k, tipo, idade in (("e" * 44, "resumo", "3 hours"), ("f" * 44, "completa", "1 minute")):
+    for k, tipo, idade in (("64" * 22, "resumo", "3 hours"), ("65" * 22, "completa", "1 minute")):
         _doc(db, k, tipo=tipo); _pedido(db, k, status="feito")
         with psycopg.connect(db, autocommit=True) as con:
             con.execute(f"update nfe.pedidos_ciencia set processado_em = now() - interval '{idade}' where chave=%s", (k,))
     assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
-    _doc(db, "g" * 44); _pedido(db, "g" * 44, status="erro")      # erro nao reabre sozinho
+    _doc(db, "66" * 22); _pedido(db, "66" * 22, status="erro")      # erro nao reabre sozinho
     assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
 
 
@@ -516,7 +519,7 @@ def test_trigger_insert_feito_ou_erro_nao_avisa(db):
     import psycopg
     with psycopg.connect(db, autocommit=True) as ouvinte, psycopg.connect(db, autocommit=True) as app:
         ouvinte.execute("listen nfe_pedidos_ciencia")
-        _pedido(db, "h" * 44, status="feito"); _pedido(db, "i" * 44, status="erro")
+        _pedido(db, "67" * 22, status="feito"); _pedido(db, "68" * 22, status="erro")
         app.execute("update nfe.pedidos_ciencia set mensagem='x'")   # update sem mexer em status
         assert list(ouvinte.notifies(timeout=1)) == []
 
@@ -586,7 +589,7 @@ def test_gatilho_main_varredura_inicial_e_notify_so_do_cnpj(gatilho_proc, db):
     assert sorted(x["NFE_EMPRESA"] for x in linhas()[:2]) == ["AAA", "BBB"]
     import time; time.sleep(0.5)
     base = len(linhas())
-    _doc(db, "j" * 44); _pedido(db, "j" * 44)                        # NOTIFY payload = CNPJ da AAA
+    _doc(db, "69" * 22); _pedido(db, "69" * 22)                        # NOTIFY payload = CNPJ da AAA
     assert espera(lambda: len(linhas()) > base, 5)
     time.sleep(1.5)                                                  # tempo para um atender(None) indevido rodar BBB
     assert linhas()[base:] == [{"NFE_EMPRESA": "AAA", "NFE_MODO": "pedidos", "NFE_DATA_DIR": str(tmp / "raiz" / "AAA")}]
@@ -613,14 +616,14 @@ def test_gatilho_main_reconecta_apos_queda_e_volta_a_atender(gatilho_proc, db):
     n = len(linhas())
     assert espera(lambda: len(linhas()) >= n + 2, 20)                # reconectou: nova varredura inicial
     time.sleep(0.5); base = len(linhas())
-    _doc(db, "k" * 44); _pedido(db, "k" * 44)
+    _doc(db, "70" * 22); _pedido(db, "70" * 22)
     assert espera(lambda: len(linhas()) > base, 2.5)
     assert linhas()[base]["NFE_EMPRESA"] == "AAA"
 
 
 def test_ciencia_resultado_nao_sobrescreve_pedido_que_deixou_de_ser_pendente(db, monkeypatch, tmp_path):
     import psycopg
-    k = "l" * 44
+    k = "71" * 22
     _pedido(db, k)
 
     def fake_run(cmd, **kw):                                       # outro processo conclui o pedido durante a chamada
@@ -630,3 +633,54 @@ def test_ciencia_resultado_nao_sobrescreve_pedido_que_deixou_de_ser_pendente(db,
     monkeypatch.setattr(rodar.subprocess, "run", fake_run)
     rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db)
     assert _consulta(db, "select status, cstat, mensagem from nfe.pedidos_ciencia") == [("feito", "135", "outro")]
+
+# ---------- R3: limites (gauntlet arquitetura B1 e nao-bloqueantes) ----------
+
+def test_ciencia_sem_resumo_no_banco_vira_erro_sem_chamar_sefaz(db, monkeypatch, tmp_path):
+    k_sem, k_completa = "1" * 44, "2" * 44
+    _pedido(db, k_sem, com_doc=False)
+    _doc(db, k_completa, tipo="completa"); _pedido(db, k_completa, com_doc=False)
+    monkeypatch.setattr(rodar.subprocess, "run", lambda *a, **k: pytest.fail("nao devia chamar a SEFAZ"))
+    assert rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db) == {"feito": 0, "erro": 0}
+    st = {r[0]: (r[1], r[2]) for r in _consulta(db, "select chave, status, mensagem from nfe.pedidos_ciencia")}
+    assert st[k_sem][0] == "erro" and "sem resumo" in st[k_sem][1]
+    assert st[k_completa][0] == "erro"
+
+
+def test_busca_por_chave_tem_limite_de_tentativas_e_intervalo(db, monkeypatch, tmp_path):
+    import psycopg
+    k = "3" * 44
+    _pedido(db, k, status="feito")
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("update nfe.pedidos_ciencia set processado_em = now()")
+    chamadas = []
+    monkeypatch.setattr(rodar.subprocess, "run", lambda cmd, **kw: chamadas.append(cmd) or subprocess.CompletedProcess(cmd, 0))
+    assert rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db) == 1
+    assert rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db) == 0      # < 5 min: nao repete
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+    for _ in range(5):                                                               # passa o intervalo varias vezes
+        with psycopg.connect(db, autocommit=True) as con:
+            con.execute("update nfe.pedidos_ciencia set ultima_busca_em = now() - interval '6 minutes'")
+        rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db)
+    assert len(chamadas) == rodar.MAX_BUSCAS == 3                                    # nunca passa do limite
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+
+
+def test_processado_em_no_futuro_nao_prolonga_a_busca(db, monkeypatch, tmp_path):
+    import psycopg
+    k = "4" * 44
+    _pedido(db, k, status="feito")
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("update nfe.pedidos_ciencia set processado_em = now() + interval '100 years'")
+    monkeypatch.setattr(rodar.subprocess, "run", lambda *a, **k: pytest.fail("nao devia buscar"))
+    assert rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db) == 0
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+
+
+def test_pedidos_ciencia_recusa_chave_e_cnpj_mal_formados(db):
+    import psycopg
+    with psycopg.connect(db, autocommit=True) as con:
+        for cnpj, chave in ((CNPJ, "abc"), ("123", "5" * 44)):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                con.execute("insert into nfe.pedidos_ciencia (cnpj_interessado, chave, solicitado_por) values (%s,%s,'x')",
+                            (cnpj, chave))
