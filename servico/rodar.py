@@ -143,7 +143,7 @@ def main():
                             cwd=dados, env=env, stdin=subprocess.DEVNULL).returncode
     cont = gravar(dados / "downloads" / cnpj, cnpj, os.environ["NFE_DB_URL"])
     print(f"Banco: {cont}", flush=True)
-    sys.exit(rc or (1 if cont["erro"] else 0))
+    sys.exit(rc or (1 if cont.get("erro") else 0))
 
 
 if __name__ == "__main__":
