@@ -146,8 +146,11 @@ def processar_pedidos_ciencia(empresa: str, cnpj: str, dados: Path, env: dict, d
                 cwd=dados, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True)
             saida = proc.stdout + proc.stderr
             print(saida, end="", flush=True)
-            m = re.search(r"cStat=(\d+)\s+(.*)", saida)
-            cstat, motivo = (m.group(1), m.group(2).strip()) if m else (None, saida.strip()[-300:])
+            # A resposta traz o cStat do lote (128) e o do evento (135/136/573/...): vale o do evento.
+            achados = [(c, m.strip()) for c, m in re.findall(r"cStat=(\d+)\s+(.*)", saida)]
+            ok = [a for a in achados if a[0] in _CIENCIA_OK]
+            evento = ok[0] if ok else next((a for a in reversed(achados) if a[0] != "128"), achados[-1] if achados else None)
+            cstat, motivo = evento if evento else (None, saida.strip()[-300:])
             status = "feito" if cstat in _CIENCIA_OK else "erro"
             cont[status] += 1
             con.execute(

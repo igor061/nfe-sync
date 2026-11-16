@@ -330,3 +330,16 @@ def test_main_processa_pedidos_antes_de_consultar(ambiente, monkeypatch):
     with pytest.raises(SystemExit):
         rodar.main()
     assert ordem == ["ciencia", "consultar-nsu"]
+
+
+def test_ciencia_usa_cstat_do_evento_e_nao_o_do_lote(db, monkeypatch, tmp_path):
+    k_ok, k_rej = "7" * 44, "8" * 44
+    _pedido(db, k_ok); _pedido(db, k_rej)
+    saidas = {  # formato real do nfe-sync manifestar (hg003, 2026-11-16 12:13)
+        k_ok: "=== RESULTADO ===\n  cStat=128  Lote de evento processado\n  cStat=135  Evento registrado e vinculado a NF-e\n  Protocolo: 591267668903764\n",
+        k_rej: "=== RESULTADO ===\n  cStat=128  Lote de evento processado\n  cStat=650  Rejeicao: NF-e cancelada\n"}
+    _fake_manifestar(monkeypatch, saidas, [])
+    assert rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db) == {"feito": 1, "erro": 1}
+    st = {r[0]: (r[1], r[2], r[3]) for r in _consulta(db, "select chave, status, cstat, mensagem from nfe.pedidos_ciencia")}
+    assert st[k_ok] == ("feito", "135", "Evento registrado e vinculado a NF-e")
+    assert st[k_rej] == ("erro", "650", "Rejeicao: NF-e cancelada")
