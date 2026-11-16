@@ -5,7 +5,9 @@ Requires=docker.service
 
 [Service]
 Type=oneshot
+ExecStartPre=-/usr/bin/docker rm -f nfe-sync-drocer
 ExecStart=/usr/bin/docker run --rm --name nfe-sync-drocer --network porv \
   --env-file /opt/porv/nfe-sync/servico.env \
   -v /opt/porv/nfe-sync/data:/data nfe-sync:hg003
 TimeoutStartSec=20min
+ExecStopPost=-/usr/bin/docker rm -f nfe-sync-drocer

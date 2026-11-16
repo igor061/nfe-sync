@@ -15,6 +15,8 @@ from lxml import etree
 import psycopg
 
 NS = {"n": "http://www.portalfiscal.inf.br/nfe"}
+_PARSER = etree.XMLParser(resolve_entities=False, no_network=True)
+_SEGREDOS = ("INFISICAL_CLIENT_SECRET", "INFISICAL_CLIENT_ID", "NFE_DB_URL")
 
 
 def _api(metodo, caminho, corpo=None, token=None):
@@ -46,7 +48,7 @@ def _t(no, caminho):
 
 def ler_xml(arquivo: Path):
     """Retorna ('documento'|'evento', campos) ou None se o XML nao for de NF-e/evento."""
-    raiz = etree.parse(str(arquivo)).getroot()
+    raiz = etree.parse(str(arquivo), _PARSER).getroot()
     tag = etree.QName(raiz).localname
     xml = arquivo.read_text(encoding="utf-8")
     if tag == "nfeProc":
@@ -105,18 +107,24 @@ where nfe.eventos.xml is distinct from excluded.xml
 
 
 def gravar(pasta: Path, cnpj: str, db_url: str) -> dict:
-    cont = {"documento": 0, "evento": 0, "ignorado": 0, "gravado": 0}
-    with psycopg.connect(db_url) as con, con.cursor() as cur:
+    """Upsert de cada XML em transacao propria: um arquivo ruim nao bloqueia os demais."""
+    cont = {"documento": 0, "evento": 0, "ignorado": 0, "gravado": 0, "erro": 0}
+    with psycopg.connect(db_url, autocommit=True) as con:
         for arquivo in sorted(pasta.glob("*.xml")):
-            lido = ler_xml(arquivo)
-            if lido is None:
-                cont["ignorado"] += 1
-                continue
-            tipo, campos = lido
-            cont[tipo] += 1
-            cur.execute(SQL_DOC if tipo == "documento" else SQL_EVENTO,
-                        {**campos, "cnpj": cnpj, "arquivo": arquivo.name})
-            cont["gravado"] += cur.rowcount
+            try:
+                lido = ler_xml(arquivo)
+                if lido is None:
+                    cont["ignorado"] += 1
+                    continue
+                tipo, campos = lido
+                with con.transaction(), con.cursor() as cur:
+                    cur.execute(SQL_DOC if tipo == "documento" else SQL_EVENTO,
+                                {**campos, "cnpj": cnpj, "arquivo": arquivo.name})
+                    cont["gravado"] += cur.rowcount
+                cont[tipo] += 1
+            except (etree.XMLSyntaxError, psycopg.DataError, psycopg.IntegrityError, AttributeError, TypeError) as e:
+                cont["erro"] += 1
+                print(f"ERRO {arquivo.name}: {type(e).__name__}: {e}", flush=True)
     return cont
 
 
@@ -128,14 +136,14 @@ def main():
         cert = Path(tmp, "cert.pfx")
         cert.write_bytes(pfx)
         conf = Path(tmp, "nfe-sync.conf.ini")
-        conf.write_text(f"[{empresa}]\npath = {cert}\nsenha = {senha}\nuf = {uf}\nhomologacao = false\ncnpj = {cnpj}\n")
-        env = {**os.environ, "NFE_SYNC_CONFIG": str(conf), "NFE_SYNC_STATE": str(dados / ".state.json"),
+        conf.write_text(f"[{empresa}]\npath = {cert}\nsenha = {senha.replace('%', '%%')}\nuf = {uf}\nhomologacao = false\ncnpj = {cnpj}\n")
+        env = {**{k: v for k, v in os.environ.items() if k not in _SEGREDOS}, "NFE_SYNC_CONFIG": str(conf), "NFE_SYNC_STATE": str(dados / ".state.json"),
                "NFE_SYNC_LOG_DIR": str(dados / "log")}
         rc = subprocess.run([sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa],
                             cwd=dados, env=env, stdin=subprocess.DEVNULL).returncode
     cont = gravar(dados / "downloads" / cnpj, cnpj, os.environ["NFE_DB_URL"])
     print(f"Banco: {cont}", flush=True)
-    sys.exit(rc)
+    sys.exit(rc or (1 if cont["erro"] else 0))
 
 
 if __name__ == "__main__":
