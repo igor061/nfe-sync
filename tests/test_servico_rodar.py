@@ -551,12 +551,13 @@ STUB = ("import os,json\nopen(os.environ['LOGF'],'a').write(json.dumps({k:os.env
 
 
 @pytest.fixture
-def gatilho_proc(db, tmp_path):
+def gatilho_proc(db, tmp_path, request):
     import json, time
     d = tmp_path / "g"; d.mkdir()
     src = (RAIZ / "servico" / "gatilho.py").read_text()
     assert "VARREDURA_S = 600" in src
-    (d / "gatilho.py").write_text(src.replace("VARREDURA_S = 600", "VARREDURA_S = 3"))
+    varredura = getattr(request, "param", 60)
+    (d / "gatilho.py").write_text(src.replace("VARREDURA_S = 600", f"VARREDURA_S = {varredura}"))
     (d / "rodar.py").write_text(STUB)
     emp = tmp_path / "emp"; emp.mkdir()
     (emp / "AAA.env").write_text(f"NFE_EMPRESA=AAA\nNFE_CNPJ={CNPJ}\n")
@@ -579,20 +580,25 @@ def gatilho_proc(db, tmp_path):
     p.kill(); p.wait()
 
 
-def test_gatilho_main_varredura_inicial_notify_so_do_cnpj_e_varredura_periodica(gatilho_proc, db):
-    p, linhas, espera, tmp = gatilho_proc
-    assert espera(lambda: len(linhas()) >= 2)                       # varredura inicial: todas as instancias
+def test_gatilho_main_varredura_inicial_e_notify_so_do_cnpj(gatilho_proc, db):
+    p, linhas, espera, tmp = gatilho_proc                            # varredura periodica = 60 s: nao interfere
+    assert espera(lambda: len(linhas()) >= 2, 8)                     # varredura inicial: todas as instancias
     assert sorted(x["NFE_EMPRESA"] for x in linhas()[:2]) == ["AAA", "BBB"]
-    assert espera(lambda: p.poll() is None)
     import time; time.sleep(0.5)
     base = len(linhas())
     _doc(db, "j" * 44); _pedido(db, "j" * 44)                        # NOTIFY payload = CNPJ da AAA
-    assert espera(lambda: len(linhas()) > base, 2.5)                 # imediato, antes da varredura (3 s)
-    novos = linhas()[base:base + 1]
-    assert novos == [{"NFE_EMPRESA": "AAA", "NFE_MODO": "pedidos", "NFE_DATA_DIR": str(tmp / "raiz" / "AAA")}]
-    assert "BBB" not in [x["NFE_EMPRESA"] for x in linhas()[base:base + 1]]
+    assert espera(lambda: len(linhas()) > base, 5)
+    time.sleep(1.5)                                                  # tempo para um atender(None) indevido rodar BBB
+    assert linhas()[base:] == [{"NFE_EMPRESA": "AAA", "NFE_MODO": "pedidos", "NFE_DATA_DIR": str(tmp / "raiz" / "AAA")}]
+
+
+@pytest.mark.parametrize("gatilho_proc", [3], indirect=True)
+def test_gatilho_main_varredura_periodica(gatilho_proc, db):
+    p, linhas, espera, tmp = gatilho_proc
+    assert espera(lambda: len(linhas()) >= 2, 8)
     n = len(linhas())
-    assert espera(lambda: len(linhas()) >= n + 2, 8)                 # varredura periodica pega as duas
+    assert espera(lambda: len(linhas()) >= n + 2, 8)                 # sem nenhum NOTIFY, a varredura roda todas
+    assert {x["NFE_EMPRESA"] for x in linhas()[n:n + 2]} == {"AAA", "BBB"}
 
 
 def test_gatilho_main_reconecta_apos_queda_e_volta_a_atender(gatilho_proc, db):
@@ -610,3 +616,17 @@ def test_gatilho_main_reconecta_apos_queda_e_volta_a_atender(gatilho_proc, db):
     _doc(db, "k" * 44); _pedido(db, "k" * 44)
     assert espera(lambda: len(linhas()) > base, 2.5)
     assert linhas()[base]["NFE_EMPRESA"] == "AAA"
+
+
+def test_ciencia_resultado_nao_sobrescreve_pedido_que_deixou_de_ser_pendente(db, monkeypatch, tmp_path):
+    import psycopg
+    k = "l" * 44
+    _pedido(db, k)
+
+    def fake_run(cmd, **kw):                                       # outro processo conclui o pedido durante a chamada
+        with psycopg.connect(db, autocommit=True) as con:
+            con.execute("update nfe.pedidos_ciencia set status='feito', cstat='135', mensagem='outro'")
+        return subprocess.CompletedProcess(cmd, 0, stdout="cStat=650  Rejeicao\n", stderr="")
+    monkeypatch.setattr(rodar.subprocess, "run", fake_run)
+    rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db)
+    assert _consulta(db, "select status, cstat, mensagem from nfe.pedidos_ciencia") == [("feito", "135", "outro")]
