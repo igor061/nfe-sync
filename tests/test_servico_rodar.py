@@ -452,3 +452,161 @@ def test_main_trava_por_empresa(ambiente, monkeypatch):
     with pytest.raises(SystemExit):
         rodar.main()
     assert travas == [(".lock", rodar.fcntl.LOCK_EX)]
+
+
+# ---------- QA R3: ler_env, ciencia (env/cwd), trava real, loop main do gatilho ----------
+
+def test_ler_env_ignora_comentario_e_vazio_e_preserva_igual_no_valor(tmp_path):
+    f = tmp_path / "A.env"
+    f.write_text("# c\n\n  NFE_EMPRESA = A \nSENHA=a=b=c\nsem_igual\n#X=1\n")
+    assert gatilho.ler_env(f) == {"NFE_EMPRESA": "A", "SENHA": "a=b=c"}
+
+
+def test_ciencia_passa_env_e_cwd_do_chamador(db, monkeypatch, tmp_path):
+    k = "a" * 44
+    _pedido(db, k)
+    chamadas = []
+    _fake_manifestar(monkeypatch, {k: "cStat=135  ok\n"}, chamadas)
+    rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {"NFE_SYNC_CONFIG": "/c.ini"}, db)
+    assert chamadas[0][1]["env"] == {"NFE_SYNC_CONFIG": "/c.ini"} and chamadas[0][1]["cwd"] == tmp_path
+
+
+def test_ciencia_so_lote_128_vira_erro_com_cstat_e_motivo(db, monkeypatch, tmp_path):
+    k = "b" * 44
+    _pedido(db, k)
+    _fake_manifestar(monkeypatch, {k: "cStat=128  Lote de evento processado\n"}, [])
+    assert rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db) == {"feito": 0, "erro": 1}
+    assert _consulta(db, "select status, cstat, mensagem from nfe.pedidos_ciencia") == [
+        ("erro", "128", "Lote de evento processado")]
+
+
+def test_ciencia_feito_nao_repete_na_segunda_rodada(db, monkeypatch, tmp_path):
+    k = "c" * 44
+    _pedido(db, k)
+    chamadas = []
+    _fake_manifestar(monkeypatch, {k: "cStat=135  ok\n"}, chamadas)
+    rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db)
+    assert rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db) == {"feito": 0, "erro": 0}
+    assert len(chamadas) == 1
+
+
+def test_baixa_pela_chave_ignora_outro_cnpj(db, monkeypatch, tmp_path):
+    k = "d" * 44
+    _doc(db, k, cnpj="99999999000199"); _pedido(db, k, status="feito", cnpj="99999999000199")
+    import psycopg
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("update nfe.pedidos_ciencia set processado_em = now()")
+    chamadas = []
+    monkeypatch.setattr(rodar.subprocess, "run", lambda cmd, **kw: chamadas.append(cmd))
+    assert rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db) == 0 and chamadas == []
+
+
+def test_ha_pedidos_feito_antigo_ou_ja_completa_nao_conta(db):
+    import psycopg
+    for k, tipo, idade in (("e" * 44, "resumo", "3 hours"), ("f" * 44, "completa", "1 minute")):
+        _doc(db, k, tipo=tipo); _pedido(db, k, status="feito")
+        with psycopg.connect(db, autocommit=True) as con:
+            con.execute(f"update nfe.pedidos_ciencia set processado_em = now() - interval '{idade}' where chave=%s", (k,))
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+    _doc(db, "g" * 44); _pedido(db, "g" * 44, status="erro")      # erro nao reabre sozinho
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+
+
+def test_trigger_insert_feito_ou_erro_nao_avisa(db):
+    import psycopg
+    with psycopg.connect(db, autocommit=True) as ouvinte, psycopg.connect(db, autocommit=True) as app:
+        ouvinte.execute("listen nfe_pedidos_ciencia")
+        _pedido(db, "h" * 44, status="feito"); _pedido(db, "i" * 44, status="erro")
+        app.execute("update nfe.pedidos_ciencia set mensagem='x'")   # update sem mexer em status
+        assert list(ouvinte.notifies(timeout=1)) == []
+
+
+def test_trava_real_serializa_rodadas_da_mesma_empresa(tmp_path):
+    """Dois processos reais de rodar.py na mesma NFE_DATA_DIR: o 2o espera o 1o (flock de verdade)."""
+    import time
+    bin_ = tmp_path / "pkg" / "nfe_sync"; bin_.mkdir(parents=True)
+    (bin_ / "__init__.py").write_text("")
+    (bin_ / "cli.py").write_text(
+        "import os,time\nlog=open(os.environ['LOGF'],'a')\nlog.write('ini\\n');log.flush()\n"
+        "time.sleep(1.5)\nlog.write('fim\\n');log.flush()\n")
+    runner = tmp_path / "runner.py"
+    runner.write_text(
+        "import sys,importlib.util\nsys.path.insert(0,%r)\n" % str(tmp_path / "pkg") +
+        "s=importlib.util.spec_from_file_location('r',%r)\nr=importlib.util.module_from_spec(s);s.loader.exec_module(r)\n" % str(RAIZ / "servico" / "rodar.py") +
+        "r.buscar_certificado=lambda n:(b'x','s')\nr.gravar=lambda *a:{}\nr.processar_pedidos_ciencia=lambda *a:{}\n"
+        "r.baixar_completas_pedidas=lambda *a:0\nr.main()\n")
+    dados = tmp_path / "d"
+    env = {**os.environ, "NFE_EMPRESA": "E", "NFE_CNPJ": CNPJ, "NFE_UF": "df", "NFE_DATA_DIR": str(dados),
+           "NFE_DB_URL": "x", "LOGF": str(tmp_path / "log.txt"), "PYTHONPATH": str(tmp_path / "pkg")}
+    ps = [subprocess.Popen([sys.executable, str(runner)], env=env) for _ in range(2)]
+    for p in ps:
+        assert p.wait(30) == 0
+    assert (tmp_path / "log.txt").read_text().split() == ["ini", "fim", "ini", "fim"]
+
+
+# loop main do gatilho com Postgres real e rodar.py de mentira (grava env num log)
+
+STUB = ("import os,json\nopen(os.environ['LOGF'],'a').write(json.dumps({k:os.environ.get(k) for k in "
+        "('NFE_EMPRESA','NFE_MODO','NFE_DATA_DIR')})+'\\n')\n")
+
+
+@pytest.fixture
+def gatilho_proc(db, tmp_path):
+    import json, time
+    d = tmp_path / "g"; d.mkdir()
+    src = (RAIZ / "servico" / "gatilho.py").read_text()
+    assert "VARREDURA_S = 600" in src
+    (d / "gatilho.py").write_text(src.replace("VARREDURA_S = 600", "VARREDURA_S = 3"))
+    (d / "rodar.py").write_text(STUB)
+    emp = tmp_path / "emp"; emp.mkdir()
+    (emp / "AAA.env").write_text(f"NFE_EMPRESA=AAA\nNFE_CNPJ={CNPJ}\n")
+    (emp / "BBB.env").write_text("NFE_EMPRESA=BBB\nNFE_CNPJ=99999999000199\n")
+    log = tmp_path / "log.jsonl"
+    env = {**os.environ, "NFE_DB_URL": db, "NFE_EMPRESAS_DIR": str(emp), "NFE_DADOS_RAIZ": str(tmp_path / "raiz"), "LOGF": str(log)}
+    p = subprocess.Popen([sys.executable, "-u", str(d / "gatilho.py")], env=env, stdout=subprocess.PIPE, text=True)
+
+    def linhas():
+        return [json.loads(x) for x in log.read_text().splitlines()] if log.exists() else []
+
+    def espera(cond, t=20):
+        fim = time.monotonic() + t
+        while time.monotonic() < fim:
+            if cond():
+                return True
+            time.sleep(0.1)
+        return False
+    yield p, linhas, espera, tmp_path
+    p.kill(); p.wait()
+
+
+def test_gatilho_main_varredura_inicial_notify_so_do_cnpj_e_varredura_periodica(gatilho_proc, db):
+    p, linhas, espera, tmp = gatilho_proc
+    assert espera(lambda: len(linhas()) >= 2)                       # varredura inicial: todas as instancias
+    assert sorted(x["NFE_EMPRESA"] for x in linhas()[:2]) == ["AAA", "BBB"]
+    assert espera(lambda: p.poll() is None)
+    import time; time.sleep(0.5)
+    base = len(linhas())
+    _doc(db, "j" * 44); _pedido(db, "j" * 44)                        # NOTIFY payload = CNPJ da AAA
+    assert espera(lambda: len(linhas()) > base, 2.5)                 # imediato, antes da varredura (3 s)
+    novos = linhas()[base:base + 1]
+    assert novos == [{"NFE_EMPRESA": "AAA", "NFE_MODO": "pedidos", "NFE_DATA_DIR": str(tmp / "raiz" / "AAA")}]
+    assert "BBB" not in [x["NFE_EMPRESA"] for x in linhas()[base:base + 1]]
+    n = len(linhas())
+    assert espera(lambda: len(linhas()) >= n + 2, 8)                 # varredura periodica pega as duas
+
+
+def test_gatilho_main_reconecta_apos_queda_e_volta_a_atender(gatilho_proc, db):
+    import psycopg
+    p, linhas, espera, tmp = gatilho_proc
+    assert espera(lambda: len(linhas()) >= 2)
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("select pg_terminate_backend(pid) from pg_stat_activity where pid <> pg_backend_pid() "
+                    "and datname = current_database()")
+    import time; time.sleep(1)
+    assert p.poll() is None                                          # nao morreu
+    n = len(linhas())
+    assert espera(lambda: len(linhas()) >= n + 2, 20)                # reconectou: nova varredura inicial
+    time.sleep(0.5); base = len(linhas())
+    _doc(db, "k" * 44); _pedido(db, "k" * 44)
+    assert espera(lambda: len(linhas()) > base, 2.5)
+    assert linhas()[base]["NFE_EMPRESA"] == "AAA"
