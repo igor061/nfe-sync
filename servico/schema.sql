@@ -51,6 +51,16 @@ create table if not exists nfe.pedidos_ciencia (
     primary key (cnpj_interessado, chave)
 );
 
+-- Limite da busca do XML pela chave depois da ciencia (evita martelar a SEFAZ) e formato.
+alter table nfe.pedidos_ciencia add column if not exists buscas int not null default 0;
+alter table nfe.pedidos_ciencia add column if not exists ultima_busca_em timestamptz;
+do $$ begin
+    alter table nfe.pedidos_ciencia add constraint pedidos_ciencia_chave_fmt check (chave ~ '^[0-9]{44}$');
+exception when duplicate_object then null; end $$;
+do $$ begin
+    alter table nfe.pedidos_ciencia add constraint pedidos_ciencia_cnpj_fmt check (cnpj_interessado ~ '^[0-9]{14}$');
+exception when duplicate_object then null; end $$;
+
 -- Gatilho: pedido pendente novo (ou reaberto) avisa o servico na hora (LISTEN nfe_pedidos_ciencia).
 create or replace function nfe.avisar_pedido_ciencia() returns trigger language plpgsql as $$
 begin

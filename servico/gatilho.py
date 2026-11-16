@@ -39,8 +39,11 @@ def atender(cnpj: str | None, dir_empresas: Path, raiz_dados: Path) -> list[str]
         if cnpj and emp.get("NFE_CNPJ") != cnpj:
             continue
         env = {**os.environ, **emp, "NFE_MODO": "pedidos", "NFE_DATA_DIR": str(raiz_dados / nome)}
-        subprocess.run([sys.executable, str(Path(__file__).with_name("rodar.py"))], env=env,
-                       stdin=subprocess.DEVNULL)
+        try:
+            subprocess.run([sys.executable, str(Path(__file__).with_name("rodar.py"))], env=env,
+                           stdin=subprocess.DEVNULL, timeout=900)
+        except subprocess.TimeoutExpired:
+            print(f"gatilho: rodada de {nome} passou de 15 min; abortada", flush=True)
         rodadas.append(nome)
     return rodadas
 

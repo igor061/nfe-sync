@@ -278,9 +278,12 @@ def test_main_certificado_por_nfe_cert(ambiente, monkeypatch, cert_env, esperado
 
 # ---------- AC6: pedidos de ciencia vindos da UI ----------
 
-def _pedido(db, chave, status="pendente", cnpj=CNPJ):
+def _pedido(db, chave, status="pendente", cnpj=CNPJ, com_doc=True):
     import psycopg
     with psycopg.connect(db, autocommit=True) as con:
+        if com_doc:
+            con.execute("insert into nfe.documentos (cnpj_interessado, chave, tipo, arquivo, xml) "
+                        "values (%s,%s,'resumo','a','<x/>') on conflict do nothing", (cnpj, chave))
         con.execute("insert into nfe.pedidos_ciencia (cnpj_interessado, chave, solicitado_por, status) "
                     "values (%s, %s, 'teste@x', %s)", (cnpj, chave, status))
 
@@ -352,8 +355,8 @@ def test_ciencia_usa_cstat_do_evento_e_nao_o_do_lote(db, monkeypatch, tmp_path):
 def _doc(db, chave, tipo="resumo", cnpj=CNPJ):
     import psycopg
     with psycopg.connect(db, autocommit=True) as con:
-        con.execute("insert into nfe.documentos (cnpj_interessado, chave, tipo, arquivo, xml) values (%s,%s,%s,'a','<x/>')",
-                    (cnpj, chave, tipo))
+        con.execute("insert into nfe.documentos (cnpj_interessado, chave, tipo, arquivo, xml) values (%s,%s,%s,'a','<x/>') "
+                    "on conflict (cnpj_interessado, chave) do update set tipo = excluded.tipo", (cnpj, chave, tipo))
 
 
 def test_baixa_pela_chave_so_ciencia_feita_recente_e_ainda_resumo(db, monkeypatch, tmp_path):
@@ -452,3 +455,56 @@ def test_main_trava_por_empresa(ambiente, monkeypatch):
     with pytest.raises(SystemExit):
         rodar.main()
     assert travas == [(".lock", rodar.fcntl.LOCK_EX)]
+
+
+
+# ---------- R3: limites (gauntlet arquitetura B1 e nao-bloqueantes) ----------
+
+def test_ciencia_sem_resumo_no_banco_vira_erro_sem_chamar_sefaz(db, monkeypatch, tmp_path):
+    k_sem, k_completa = "1" * 44, "2" * 44
+    _pedido(db, k_sem, com_doc=False)
+    _doc(db, k_completa, tipo="completa"); _pedido(db, k_completa, com_doc=False)
+    monkeypatch.setattr(rodar.subprocess, "run", lambda *a, **k: pytest.fail("nao devia chamar a SEFAZ"))
+    assert rodar.processar_pedidos_ciencia("DROCER", CNPJ, tmp_path, {}, db) == {"feito": 0, "erro": 0}
+    st = {r[0]: (r[1], r[2]) for r in _consulta(db, "select chave, status, mensagem from nfe.pedidos_ciencia")}
+    assert st[k_sem][0] == "erro" and "sem resumo" in st[k_sem][1]
+    assert st[k_completa][0] == "erro"
+
+
+def test_busca_por_chave_tem_limite_de_tentativas_e_intervalo(db, monkeypatch, tmp_path):
+    import psycopg
+    k = "3" * 44
+    _pedido(db, k, status="feito")
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("update nfe.pedidos_ciencia set processado_em = now()")
+    chamadas = []
+    monkeypatch.setattr(rodar.subprocess, "run", lambda cmd, **kw: chamadas.append(cmd) or subprocess.CompletedProcess(cmd, 0))
+    assert rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db) == 1
+    assert rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db) == 0      # < 5 min: nao repete
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+    for _ in range(5):                                                               # passa o intervalo varias vezes
+        with psycopg.connect(db, autocommit=True) as con:
+            con.execute("update nfe.pedidos_ciencia set ultima_busca_em = now() - interval '6 minutes'")
+        rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db)
+    assert len(chamadas) == rodar.MAX_BUSCAS == 3                                    # nunca passa do limite
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+
+
+def test_processado_em_no_futuro_nao_prolonga_a_busca(db, monkeypatch, tmp_path):
+    import psycopg
+    k = "4" * 44
+    _pedido(db, k, status="feito")
+    with psycopg.connect(db, autocommit=True) as con:
+        con.execute("update nfe.pedidos_ciencia set processado_em = now() + interval '100 years'")
+    monkeypatch.setattr(rodar.subprocess, "run", lambda *a, **k: pytest.fail("nao devia buscar"))
+    assert rodar.baixar_completas_pedidas("DROCER", CNPJ, tmp_path, {}, db) == 0
+    assert rodar.ha_pedidos_a_fazer(CNPJ, db) is False
+
+
+def test_pedidos_ciencia_recusa_chave_e_cnpj_mal_formados(db):
+    import psycopg
+    with psycopg.connect(db, autocommit=True) as con:
+        for cnpj, chave in ((CNPJ, "abc"), ("123", "5" * 44)):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                con.execute("insert into nfe.pedidos_ciencia (cnpj_interessado, chave, solicitado_por) values (%s,%s,'x')",
+                            (cnpj, chave))
