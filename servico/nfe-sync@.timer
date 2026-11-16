@@ -1,0 +1,11 @@
+[Unit]
+Description=nfe-sync %i a cada 62 min (SEFAZ exige 1h entre consultas sem novidade)
+
+[Timer]
+# Relativo ao fim da ultima rodada: o nfe-sync grava cooldown de 1h apos cStat 137,
+# entao horario fixo caia dentro do cooldown e falhava uma rodada sim, outra nao.
+OnBootSec=5min
+OnUnitInactiveSec=62min
+
+[Install]
+WantedBy=timers.target

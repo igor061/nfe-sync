@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.1
+- feat(servico): rodada agendada no hg003 que grava NF-e no Postgres
+
 ## 1.0.0
 - release: versão 1.0.0 — estável com emissão, consulta, manifestação, inutilização, cancelamento e distribuição DFe
 

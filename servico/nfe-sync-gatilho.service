@@ -1,0 +1,19 @@
+[Unit]
+Description=nfe-sync gatilho: atende na hora os pedidos de ciencia da UI (LISTEN no supabase-db)
+After=docker.service
+Requires=docker.service
+
+[Service]
+# Processo continuo; cada aviso roda rodar.py em modo 'pedidos' para a(s) instancia(s) do CNPJ.
+ExecStartPre=-/usr/bin/docker rm -f nfe-sync-gatilho
+ExecStart=/usr/bin/docker run --rm --init --name nfe-sync-gatilho --network porv \
+  --env-file /opt/porv/nfe-sync/servico.env \
+  -v /opt/porv/nfe-sync/empresas:/empresas:ro \
+  -v /opt/porv/nfe-sync/data:/dados \
+  --entrypoint python nfe-sync:hg003 /app/gatilho.py
+ExecStop=/usr/bin/docker stop -t 30 nfe-sync-gatilho
+Restart=always
+RestartSec=15
+
+[Install]
+WantedBy=multi-user.target

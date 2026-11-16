@@ -1,0 +1,16 @@
+[Unit]
+Description=nfe-sync %i: baixa NF-e recebidas (SEFAZ) e grava no supabase-db
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# Comum (Infisical, banco) + por empresa (NFE_EMPRESA, NFE_CERT, NFE_CNPJ, NFE_UF).
+# Estado e XMLs separados por empresa: rodadas de empresas diferentes nao disputam o .state.json.
+ExecStartPre=-/usr/bin/docker rm -f nfe-sync-%i
+ExecStart=/usr/bin/docker run --rm --name nfe-sync-%i --network porv \
+  --env-file /opt/porv/nfe-sync/servico.env \
+  --env-file /opt/porv/nfe-sync/empresas/%i.env \
+  -v /opt/porv/nfe-sync/data/%i:/data nfe-sync:hg003
+TimeoutStartSec=20min
+ExecStopPost=-/usr/bin/docker rm -f nfe-sync-%i
