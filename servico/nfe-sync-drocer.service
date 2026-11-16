@@ -1,0 +1,11 @@
+[Unit]
+Description=nfe-sync: baixa NF-e recebidas da DROCER (SEFAZ) e grava no supabase-db
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/docker run --rm --name nfe-sync-drocer --network porv \
+  --env-file /opt/porv/nfe-sync/servico.env \
+  -v /opt/porv/nfe-sync/data:/data nfe-sync:hg003
+TimeoutStartSec=20min
