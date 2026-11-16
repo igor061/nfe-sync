@@ -122,7 +122,7 @@ def gravar(pasta: Path, cnpj: str, db_url: str) -> dict:
                                 {**campos, "cnpj": cnpj, "arquivo": arquivo.name})
                     cont["gravado"] += cur.rowcount
                 cont[tipo] += 1
-            except (etree.XMLSyntaxError, psycopg.DataError, psycopg.IntegrityError, AttributeError, TypeError) as e:
+            except (etree.XMLSyntaxError, UnicodeDecodeError, ValueError, psycopg.DataError, psycopg.IntegrityError, AttributeError, TypeError) as e:
                 cont["erro"] += 1
                 print(f"ERRO {arquivo.name}: {type(e).__name__}: {e}", flush=True)
     return cont
