@@ -131,7 +131,8 @@ def gravar(pasta: Path, cnpj: str, db_url: str) -> dict:
 def main():
     empresa, cnpj, uf = os.environ["NFE_EMPRESA"], os.environ["NFE_CNPJ"], os.environ["NFE_UF"]
     dados = Path(os.environ.get("NFE_DATA_DIR", "/data"))
-    pfx, senha = buscar_certificado(empresa)
+    # Filial usa o certificado da matriz (mesma raiz de CNPJ): NFE_CERT aponta o prefixo no Infisical.
+    pfx, senha = buscar_certificado(os.environ.get("NFE_CERT", empresa))
     with tempfile.TemporaryDirectory() as tmp:
         cert = Path(tmp, "cert.pfx")
         cert.write_bytes(pfx)

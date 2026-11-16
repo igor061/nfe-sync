@@ -252,3 +252,23 @@ def test_main_exit_code_considera_erros_de_arquivo(ambiente, monkeypatch, rc, er
     with pytest.raises(SystemExit) as e:
         rodar.main()
     assert e.value.code == esperado
+
+
+# ---------- AC5: filial usa o certificado da matriz ----------
+
+@pytest.mark.parametrize("cert_env,esperado", [(None, "SRJK2"), ("SRJK", "SRJK")])
+def test_main_certificado_por_nfe_cert(ambiente, monkeypatch, cert_env, esperado):
+    monkeypatch.setenv("NFE_EMPRESA", "SRJK2")
+    if cert_env:
+        monkeypatch.setenv("NFE_CERT", cert_env)
+    else:
+        monkeypatch.delenv("NFE_CERT", raising=False)
+    pedidos = []
+    monkeypatch.setattr(rodar, "buscar_certificado", lambda nome: pedidos.append(nome) or (b"PFX", "s"))
+    cap, grav = {}, []
+    _roda(monkeypatch, 0, cap, grav)
+    with pytest.raises(SystemExit):
+        rodar.main()
+    assert pedidos == [esperado]
+    assert cap["cmd"][-1] == "SRJK2"          # secao do ini / consulta = instancia (CNPJ da filial)
+    assert "[SRJK2]" in cap["conf"]
