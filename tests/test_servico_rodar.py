@@ -334,7 +334,8 @@ def test_ciencia_saida_sem_cstat_vira_erro(db, monkeypatch, tmp_path):
 def test_main_processa_pedidos_antes_de_consultar(ambiente, monkeypatch):
     ordem = []
     monkeypatch.setattr(rodar, "processar_pedidos_ciencia", lambda *a: ordem.append("ciencia") or {"feito": 0, "erro": 0})
-    monkeypatch.setattr(rodar.subprocess, "run", lambda cmd, **kw: ordem.append(cmd[4]) or subprocess.CompletedProcess(cmd, 0))
+    monkeypatch.setattr(rodar, "consultar_nsu", lambda empresa, dados, env: ordem.append("consultar-nsu") or (0, {}))
+    monkeypatch.setattr(rodar, "gravar_status", lambda *a: None)
     monkeypatch.setattr(rodar, "gravar", lambda *a: {})
     with pytest.raises(SystemExit):
         rodar.main()
