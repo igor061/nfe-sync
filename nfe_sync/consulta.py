@@ -13,6 +13,9 @@ from .results import Documento, ResultadoConsulta, ResultadoDfeChave, ResultadoD
 
 
 COOLDOWN_MINUTOS = 61
+# 656 = outro sistema consultou o mesmo CNPJ na ultima hora; insistir so zera
+# o relogio da SEFAZ de novo. Recua 4h.
+COOLDOWN_656_MINUTOS = 240
 NS = {"ns": "http://www.portalfiscal.inf.br/nfe"}
 
 # Assinatura do callback de progresso de consultar_nsu:
@@ -260,7 +263,8 @@ def consultar_nsu(
                 break
 
     if c_stat in ("137", "656"):
-        set_cooldown(estado, cnpj, calcular_proximo_cooldown(), ambiente)
+        minutos = COOLDOWN_656_MINUTOS if c_stat == "656" else COOLDOWN_MINUTOS
+        set_cooldown(estado, cnpj, calcular_proximo_cooldown(minutos), ambiente)
         if state_file:
             salvar_estado(state_file, estado)
 

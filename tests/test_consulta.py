@@ -390,6 +390,19 @@ class TestConsultarNsuCstat656:
             "cStat=656 deve registrar cooldown no estado"
 
     @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
+    def test_656_recua_4h_e_137_recua_1h(self, mock_sefaz_cls, empresa_sul, tmp_path):
+        """656 = outro sistema consultou o CNPJ; recua 4h em vez de 1h."""
+        cnpj = empresa_sul.emitente.cnpj
+        for xml, esperado in ((self.XML_656, 240), (self.XML_656.replace(b"656", b"137"), 61)):
+            mock_sefaz_cls.return_value.consulta_distribuicao.return_value = MagicMock(content=xml)
+            state_file = str(tmp_path / f"s{esperado}.json")
+            antes = datetime.now().astimezone()
+            consultar_nsu(empresa_sul, {}, state_file)
+            ate = datetime.fromisoformat(carregar_estado(state_file)["cooldown"][f"{cnpj}:homologacao"])
+            minutos = (ate - antes).total_seconds() / 60
+            assert esperado - 1 <= minutos <= esperado + 1, (xml[:0], esperado, minutos)
+
+    @patch("nfe_sync.xml_utils.ComunicacaoSefaz")
     def test_656_sucesso_false(self, mock_sefaz_cls, empresa_sul, tmp_path):
         mock_resp = MagicMock()
         mock_resp.content = self.XML_656
