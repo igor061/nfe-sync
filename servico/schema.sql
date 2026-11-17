@@ -70,3 +70,42 @@ end $$;
 drop trigger if exists avisar_pedido_ciencia on nfe.pedidos_ciencia;
 create trigger avisar_pedido_ciencia after insert or update of status on nfe.pedidos_ciencia
     for each row when (new.status = 'pendente') execute function nfe.avisar_pedido_ciencia();
+
+-- Pedagio: ultimo estado da consulta por NSU de cada empresa (uma linha por CNPJ), gravado pela rodada.
+-- bloqueado_ate = fim do cooldown (137: 61 min, 656: 240 min); consultado_em/cstat/motivo = ultima consulta real.
+create table if not exists nfe.consultas_status (
+    cnpj_interessado char(14)    primary key check (cnpj_interessado ~ '^[0-9]{14}$'),
+    empresa          text        not null,
+    rodada_em        timestamptz not null,
+    consultado_em    timestamptz,
+    cstat            text,
+    motivo           text,
+    ult_nsu          bigint,
+    max_nsu          bigint,
+    bloqueado_ate    timestamptz,
+    ultimo_656_em    timestamptz
+);
+
+-- Pedidos de consulta (botao da UI): o gatilho roda a rodada normal da empresa; forcar = ignora o cooldown.
+create table if not exists nfe.pedidos_consulta (
+    id               bigserial   primary key,
+    cnpj_interessado char(14)    not null check (cnpj_interessado ~ '^[0-9]{14}$'),
+    solicitado_por   text        not null,
+    solicitado_em    timestamptz not null default now(),
+    forcar           boolean     not null default false,
+    status           text        not null default 'pendente' check (status in ('pendente', 'feito', 'erro')),
+    cstat            text,
+    mensagem         text,
+    processado_em    timestamptz
+);
+create unique index if not exists pedidos_consulta_pendente_uq on nfe.pedidos_consulta (cnpj_interessado)
+    where status = 'pendente';
+
+create or replace function nfe.avisar_pedido_consulta() returns trigger language plpgsql as $$
+begin
+    perform pg_notify('nfe_pedidos_consulta', new.cnpj_interessado);
+    return new;
+end $$;
+drop trigger if exists avisar_pedido_consulta on nfe.pedidos_consulta;
+create trigger avisar_pedido_consulta after insert or update of status on nfe.pedidos_consulta
+    for each row when (new.status = 'pendente') execute function nfe.avisar_pedido_consulta();
