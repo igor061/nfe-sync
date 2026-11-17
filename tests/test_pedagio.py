@@ -186,6 +186,13 @@ def test_ac3_bloqueada_primeira_vez_nao_inventa_consulta(amb, db):
     assert _status(db) == [(None, None, None, None, False, True, False, "DROCER")]
 
 
+def test_ac3_bloqueado_vence_mesmo_com_linha_status_na_saida(amb, db):
+    dados, roda = amb
+    roda(OK137)
+    roda("Status: 137|Motivo: outro|Ultimo NSU: 999|Max NSU: 999|BLOQUEADO: cooldown", rc=1, cooldown=_futuro(30))
+    assert _status(db)[0][:4] == ("137", "Nenhum documento localizado", 100, 250)
+
+
 # ---------- AC4 ----------
 
 def _grava_cooldown(dados, ate):
@@ -459,6 +466,8 @@ def test_ac7_filtra_por_cnpj_e_ignora_nao_pendentes(db, gat):
     assert _pedido_row(db)[0][0] == "pendente"                    # o da DROCER segue pendente
     _atende(db, gat)                                              # varredura (None) pega o restante
     assert _pedido_row(db)[0][0] != "pendente"
+    assert len(chamadas) == 2                                     # feito antigo nao foi reprocessado
+    assert _pedido_row(db)[2] == ("feito", None, None, False)     # intacto (sem processado_em/mensagem)
 
 
 # ---------- AC8 ----------
