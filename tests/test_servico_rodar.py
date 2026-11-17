@@ -104,12 +104,17 @@ def ambiente(tmp_path, monkeypatch):
 
 
 def _roda(monkeypatch, rc, captura, gravados):
-    def fake_run(cmd, **kw):
-        cert = Path(kw["env"]["NFE_SYNC_CONFIG"]).parent / "cert.pfx"
-        captura.update(cmd=cmd, kw=kw, cert_existia=cert.exists(), cert=cert,
-                       conf=Path(kw["env"]["NFE_SYNC_CONFIG"]).read_text())
-        return subprocess.CompletedProcess(cmd, rc)
-    monkeypatch.setattr(rodar.subprocess, "run", fake_run)
+    class FakePopen:
+        def __init__(self, cmd, **kw):
+            cert = Path(kw["env"]["NFE_SYNC_CONFIG"]).parent / "cert.pfx"
+            captura.update(cmd=cmd, kw=kw, cert_existia=cert.exists(), cert=cert,
+                           conf=Path(kw["env"]["NFE_SYNC_CONFIG"]).read_text())
+            self.stdout = iter([])
+
+        def wait(self):
+            return rc
+    monkeypatch.setattr(rodar.subprocess, "Popen", FakePopen)
+    monkeypatch.setattr(rodar, "gravar_status", lambda *a: None)
     monkeypatch.setattr(rodar, "gravar", lambda *a: gravados.append(a) or {})
 
 
@@ -329,7 +334,8 @@ def test_ciencia_saida_sem_cstat_vira_erro(db, monkeypatch, tmp_path):
 def test_main_processa_pedidos_antes_de_consultar(ambiente, monkeypatch):
     ordem = []
     monkeypatch.setattr(rodar, "processar_pedidos_ciencia", lambda *a: ordem.append("ciencia") or {"feito": 0, "erro": 0})
-    monkeypatch.setattr(rodar.subprocess, "run", lambda cmd, **kw: ordem.append(cmd[4]) or subprocess.CompletedProcess(cmd, 0))
+    monkeypatch.setattr(rodar, "consultar_nsu", lambda empresa, dados, env: ordem.append("consultar-nsu") or (0, {}))
+    monkeypatch.setattr(rodar, "gravar_status", lambda *a: None)
     monkeypatch.setattr(rodar, "gravar", lambda *a: {})
     with pytest.raises(SystemExit):
         rodar.main()
@@ -549,7 +555,8 @@ def test_trava_real_serializa_rodadas_da_mesma_empresa(tmp_path):
 
 # loop main do gatilho com Postgres real e rodar.py de mentira (grava env num log)
 
-STUB = ("import os,json\nopen(os.environ['LOGF'],'a').write(json.dumps({k:os.environ.get(k) for k in "
+STUB = ("_BRT = None\ncooldown_ate = lambda *a: None\nimport os,json\nif __name__ == '__main__':\n"
+        "    open(os.environ['LOGF'],'a').write(json.dumps({k:os.environ.get(k) for k in "
         "('NFE_EMPRESA','NFE_MODO','NFE_DATA_DIR')})+'\\n')\n")
 
 
