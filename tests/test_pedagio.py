@@ -160,7 +160,7 @@ def test_ac3_bloqueada_nao_muda_consulta_mas_atualiza_rodada_e_bloqueio(amb, db,
     assert dep[3] > antes[3]
     assert abs((dep[4] - datetime.fromisoformat(ate)).total_seconds()) < 1
     hhmm = datetime.fromisoformat(ate).astimezone(rodar._BRT).strftime("%H:%M")
-    assert f"PEDÁGIO: DROCER em espera até {hhmm}\n" in capsys.readouterr().out
+    assert f"ESPERA: DROCER próxima consulta liberada às {hhmm}\n" in capsys.readouterr().out   # espera de 137 nao e pedagio
 
 
 def test_ac3_bloqueada_com_656_anterior_imprime_hora_do_656(amb, db, capsys):
@@ -177,7 +177,7 @@ def test_ac3_bloqueada_sem_656_nao_imprime_parenteses(amb, db, capsys):
     ate = _futuro(30)
     roda("BLOQUEADO: cooldown", rc=1, cooldown=ate)
     saida = capsys.readouterr().out
-    assert "PEDÁGIO: DROCER em espera até " in saida and "656 às" not in saida
+    assert "ESPERA: DROCER próxima consulta liberada às " in saida and "PEDÁGIO" not in saida and "656 às" not in saida
 
 
 def test_ac3_bloqueada_primeira_vez_nao_inventa_consulta(amb, db):
@@ -515,3 +515,53 @@ def test_consultar_nsu_parseia_info(tmp_path, monkeypatch):
     rc, info = rodar.consultar_nsu("E", tmp_path, {**os.environ, "PYTHONPATH": str(tmp_path / "pkg")})
     assert rc == 4
     assert info == {"Status": "137", "Motivo": "a: b", "Ultimo NSU": "3", "Max NSU": "9", "BLOQUEADO": "x"}
+
+
+def test_ac3_pedagio_so_quando_ultima_consulta_foi_656(amb, db, capsys):
+    """656 antigo seguido de 137: a espera seguinte e ESPERA, nao PEDAGIO com o 656 velho."""
+    dados, roda = amb
+    roda("Status: 656|Motivo: x", rc=1, cooldown=_futuro(200))
+    roda(OK137)
+    capsys.readouterr()
+    roda("BLOQUEADO: cooldown", rc=1, cooldown=_futuro(30))
+    saida = capsys.readouterr().out
+    assert "ESPERA: DROCER" in saida and "PEDÁGIO" not in saida
+
+
+# ---------- B1: limite de consulta forcada ----------
+
+def _processado_ha(db, minutos):
+    q(db, "update nfe.pedidos_consulta set processado_em = now() - make_interval(mins => %s)", minutos)
+
+
+def test_b1_segundo_forcar_em_30min_recusado_sem_rodar(db, gat):
+    emp, raiz, chamadas = gat
+    _pedir(db, forcar=True)
+    _atende(db, gat)
+    _processado_ha(db, 5)
+    _pedir(db, forcar=True)
+    _atende(db, gat)
+    linhas = _pedido_row(db)
+    assert linhas[0][0] == "feito"
+    assert linhas[1][0] == "erro" and linhas[1][2].startswith("consulta forçada recentemente; tente após ")
+    assert len(chamadas) == 1
+
+
+def test_b1_forcar_apos_30min_roda(db, gat):
+    emp, raiz, chamadas = gat
+    _pedir(db, forcar=True)
+    _atende(db, gat)
+    _processado_ha(db, 31)
+    _pedir(db, forcar=True)
+    _atende(db, gat)
+    assert [r[0] for r in _pedido_row(db)] == ["feito", "feito"] and len(chamadas) == 2
+
+
+def test_b1_pedido_sem_forcar_nao_conta_no_limite(db, gat):
+    emp, raiz, chamadas = gat
+    _pedir(db)
+    _atende(db, gat)
+    _processado_ha(db, 5)
+    _pedir(db, forcar=True)
+    _atende(db, gat)
+    assert [r[0] for r in _pedido_row(db)] == ["feito", "feito"]
