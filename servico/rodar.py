@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from lxml import etree
@@ -18,6 +19,7 @@ import psycopg
 
 NS = {"n": "http://www.portalfiscal.inf.br/nfe"}
 _PARSER = etree.XMLParser(resolve_entities=False, no_network=True)
+_BRT = timezone(timedelta(hours=-3))  # mesmo fuso que o nfe-sync usa no cooldown
 _SEGREDOS = ("INFISICAL_CLIENT_SECRET", "INFISICAL_CLIENT_ID", "NFE_DB_URL")
 
 
@@ -203,6 +205,75 @@ def ha_pedidos_a_fazer(cnpj: str, db_url: str) -> bool:
             (cnpj, MAX_BUSCAS)).fetchone()[0]
 
 
+def cooldown_ate(dados: Path, cnpj: str):
+    """Fim do cooldown (datetime com fuso) deste CNPJ no .state.json, ou None se nao ha/ja passou."""
+    try:
+        iso = json.loads((dados / ".state.json").read_text()).get("cooldown", {}).get(f"{cnpj}:producao")
+        dt = datetime.fromisoformat(iso)
+    except (OSError, ValueError, TypeError):
+        return None
+    dt = dt if dt.tzinfo else dt.replace(tzinfo=_BRT)
+    return dt if dt > datetime.now(_BRT) else None
+
+
+def remover_cooldown(dados: Path, cnpj: str, quem: str):
+    """NFE_FORCAR=1: tira o cooldown do CNPJ do estado antes de consultar (chamar com a trava)."""
+    arq = dados / ".state.json"
+    try:
+        estado = json.loads(arq.read_text())
+    except (OSError, ValueError):
+        return
+    if estado.get("cooldown", {}).pop(f"{cnpj}:producao", None):
+        arq.write_text(json.dumps(estado, indent=2, ensure_ascii=False) + "\n")
+    print(f"FORÇADO: cooldown removido a pedido de {quem}", flush=True)
+
+
+def consultar_nsu(empresa: str, dados: Path, env: dict):
+    """Roda o consultar-nsu repassando a saida linha a linha ao journal. Retorna (rc, info)."""
+    info = {}
+    proc = subprocess.Popen([sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa],
+                            cwd=dados, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, text=True)
+    for linha in proc.stdout:
+        print(linha, end="", flush=True)
+        m = re.match(r"(Status|Motivo|Ultimo NSU|Max NSU|BLOQUEADO): ?(.*)", linha.strip())
+        if m:
+            info[m.group(1)] = m.group(2)
+    return proc.wait(), info
+
+
+def gravar_status(empresa: str, cnpj: str, dados: Path, rc_info: tuple, db_url: str):
+    """Upsert em nfe.consultas_status. Bloqueado (sem consulta): so rodada_em/bloqueado_ate mudam."""
+    rc, info = rc_info
+    ate = cooldown_ate(dados, cnpj)
+    consultou = "Status" in info and "BLOQUEADO" not in info
+    cstat = info.get("Status") if consultou else None
+    with psycopg.connect(db_url, autocommit=True) as con:
+        r = con.execute(
+            "insert into nfe.consultas_status (cnpj_interessado, empresa, rodada_em, consultado_em, cstat, motivo, "
+            "ult_nsu, max_nsu, bloqueado_ate, ultimo_656_em) "
+            "values (%(c)s, %(e)s, now(), case when %(q)s then now() end, %(cs)s, %(mo)s, %(u)s, %(mx)s, %(b)s, "
+            "case when %(cs)s = '656' then now() end) "
+            "on conflict (cnpj_interessado) do update set empresa = excluded.empresa, rodada_em = now(), "
+            "bloqueado_ate = excluded.bloqueado_ate, "
+            "consultado_em = coalesce(excluded.consultado_em, nfe.consultas_status.consultado_em), "
+            "cstat = case when %(q)s then excluded.cstat else nfe.consultas_status.cstat end, "
+            "motivo = case when %(q)s then excluded.motivo else nfe.consultas_status.motivo end, "
+            "ult_nsu = coalesce(excluded.ult_nsu, nfe.consultas_status.ult_nsu), "
+            "max_nsu = coalesce(excluded.max_nsu, nfe.consultas_status.max_nsu), "
+            "ultimo_656_em = coalesce(excluded.ultimo_656_em, nfe.consultas_status.ultimo_656_em) "
+            "returning ultimo_656_em, consultado_em",
+            {"c": cnpj, "e": empresa, "q": consultou, "cs": cstat, "mo": info.get("Motivo") if consultou else None,
+             "u": int(info["Ultimo NSU"]) if consultou and "Ultimo NSU" in info else None,
+             "mx": int(info["Max NSU"]) if consultou and "Max NSU" in info else None, "b": ate}).fetchone()
+    if "BLOQUEADO" in info:
+        hora = f"{ate.astimezone(_BRT):%H:%M}" if ate else None
+        if r[0] and r[1] and r[0] >= r[1]:  # ultimo resultado foi 656: pedagio
+            print(f"PEDÁGIO: {empresa} em espera até {hora or '?'} (656 às {r[0].astimezone(_BRT):%H:%M})", flush=True)
+        else:  # espera normal (137)
+            print(f"ESPERA: {empresa} próxima consulta liberada às {hora or '?'}", flush=True)
+
+
 def main():
     empresa, cnpj, uf = os.environ["NFE_EMPRESA"], os.environ["NFE_CNPJ"], os.environ["NFE_UF"]
     dados = Path(os.environ.get("NFE_DATA_DIR", "/data"))
@@ -229,9 +300,14 @@ def main():
         baixadas = baixar_completas_pedidas(empresa, cnpj, dados, env, os.environ["NFE_DB_URL"])
         if baixadas:
             print(f"XML completo pedido pela chave: {baixadas}", flush=True)
-        rc = 0 if so_pedidos else subprocess.run(
-            [sys.executable, "-m", "nfe_sync.cli", "--producao", "consultar-nsu", empresa],
-            cwd=dados, env=env, stdin=subprocess.DEVNULL).returncode
+        if os.environ.get("NFE_FORCAR") == "1" and not so_pedidos:
+            remover_cooldown(dados, cnpj, os.environ.get("NFE_SOLICITADO_POR", "?"))
+        rc, info = (0, {}) if so_pedidos else consultar_nsu(empresa, dados, env)
+        if not so_pedidos:
+            try:
+                gravar_status(empresa, cnpj, dados, (rc, info), os.environ["NFE_DB_URL"])
+            except Exception as e:  # status e acessorio: nao pode impedir a gravacao dos XMLs
+                print(f"ERRO ao gravar consultas_status: {type(e).__name__}: {e}", flush=True)
     cont = gravar(dados / "downloads" / cnpj, cnpj, os.environ["NFE_DB_URL"])
     print(f"Banco: {cont}", flush=True)
     sys.exit(rc or (1 if cont.get("erro") else 0))
