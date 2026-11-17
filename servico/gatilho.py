@@ -20,6 +20,7 @@ from rodar import _BRT, cooldown_ate
 CANAL = "nfe_pedidos_ciencia"
 CANAL_CONSULTA = "nfe_pedidos_consulta"
 VARREDURA_S = 600
+FORCAR_INTERVALO_MIN = 30  # no maximo uma consulta forcada a cada 30 min por CNPJ
 
 
 def ler_env(arquivo: Path) -> dict:
@@ -63,6 +64,12 @@ def atender_consultas(con, cnpj: str | None, dir_empresas: Path, raiz_dados: Pat
         cstat, msg, status = None, None, "erro"
         if not insts:
             msg = "CNPJ sem instancia configurada"
+        elif forcar and (ant := con.execute(
+                "select processado_em + make_interval(mins => %s) from nfe.pedidos_consulta where cnpj_interessado = %s "
+                "and forcar and id <> %s and status in ('feito', 'erro') and not coalesce(mensagem, '') like 'consulta forçada recentemente%%' "
+                "and processado_em > now() - make_interval(mins => %s) order by processado_em desc limit 1",
+                (FORCAR_INTERVALO_MIN, c, pid, FORCAR_INTERVALO_MIN)).fetchone()):
+            msg = f"consulta forçada recentemente; tente após {ant[0].astimezone(_BRT):%H:%M}"
         elif (ate := None if forcar else cooldown_ate(raiz_dados / insts[0][0], c)):
             msg = f"em espera até {ate.astimezone(_BRT):%H:%M}"
         else:

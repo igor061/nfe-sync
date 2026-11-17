@@ -262,13 +262,16 @@ def gravar_status(empresa: str, cnpj: str, dados: Path, rc_info: tuple, db_url: 
             "ult_nsu = coalesce(excluded.ult_nsu, nfe.consultas_status.ult_nsu), "
             "max_nsu = coalesce(excluded.max_nsu, nfe.consultas_status.max_nsu), "
             "ultimo_656_em = coalesce(excluded.ultimo_656_em, nfe.consultas_status.ultimo_656_em) "
-            "returning ultimo_656_em",
+            "returning ultimo_656_em, consultado_em",
             {"c": cnpj, "e": empresa, "q": consultou, "cs": cstat, "mo": info.get("Motivo") if consultou else None,
              "u": int(info["Ultimo NSU"]) if consultou and "Ultimo NSU" in info else None,
              "mx": int(info["Max NSU"]) if consultou and "Max NSU" in info else None, "b": ate}).fetchone()
     if "BLOQUEADO" in info:
-        msg = f"em espera até {ate.astimezone(_BRT):%H:%M}" if ate else "bloqueada"
-        print(f"PEDÁGIO: {empresa} {msg}" + (f" (656 às {r[0].astimezone(_BRT):%H:%M})" if r[0] else ""), flush=True)
+        hora = f"{ate.astimezone(_BRT):%H:%M}" if ate else None
+        if r[0] and r[1] and r[0] >= r[1]:  # ultimo resultado foi 656: pedagio
+            print(f"PEDÁGIO: {empresa} em espera até {hora or '?'} (656 às {r[0].astimezone(_BRT):%H:%M})", flush=True)
+        else:  # espera normal (137)
+            print(f"ESPERA: {empresa} próxima consulta liberada às {hora or '?'}", flush=True)
 
 
 def main():
