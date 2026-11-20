@@ -63,3 +63,22 @@ solicitado_por, forcar)` em `pedidos_consulta`, `usage` na sequence. Imagem
 - Janela do 429 no app conta também as recusas do próprio gatilho; alinhar com
   `not like 'consulta forçada recentemente%'` (não bloqueia).
 - Usuário root vê uma faixa por empresa (aceito).
+
+## Iteração 2026-11-20: "Consultar agora" roda a unidade agendada
+
+Pedido do usuário: a consulta forçada deve reagendar a rodada. Antes o gatilho
+rodava `rodar.py` no próprio container e o timer (`OnUnitInactiveSec`) não via;
+a rodada seguinte caía na espera e falhava à toa. Agora o gatilho valida e grava
+`data/<INST>/.pedido-consulta.json`; `nfe-sync-pedido@<INST>.path` dispara
+`nfe-sync@<INST>.service`, que consulta, marca o pedido e apaga o arquivo.
+Pedido entregue e não concluído em 20 min vira erro.
+
+Validação (hg003): NOG 03:38 — 1 execução, pedido feito, próximo disparo
+04:19 → 04:53 (NOG tem drop-in de 75 min). Cenário 0 após as correções: DROCER
+07:37 — pedido feito, 07:38:30 → 08:39:46, arquivo apagado.
+
+Gauntlet R1 (sonnet): Arquitetura ✅ (corrigidos: arquivo que não é objeto com
+id; `stat` de arquivo recém-apagado). Testes ✅ — AC1–AC8 com mutação vermelha;
+testes do contrato antigo invertidos; suíte 316 passed com Postgres efêmero.
+Questões registradas, sem mudança: erro "rodada não concluiu" conta na janela de
+30 min do forçar.
