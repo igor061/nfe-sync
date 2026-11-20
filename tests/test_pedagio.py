@@ -674,3 +674,16 @@ def test_ac8_unit_path_aponta_arquivo_e_servico():
     linhas = [x.strip() for x in txt.splitlines()]
     assert "PathChanged=/opt/porv/nfe-sync/data/%i/.pedido-consulta.json" in linhas
     assert "Unit=nfe-sync@%i.service" in linhas
+
+
+@pytest.mark.parametrize("conteudo", ["[1]", '"x"', '{"id": "7"}', "{}", "{quebrado"])
+def test_ler_pedido_ignora_arquivo_que_nao_e_pedido(tmp_path, conteudo):
+    import rodar as r
+    (tmp_path / r.ARQ_PEDIDO).write_text(conteudo)
+    assert r.ler_pedido(tmp_path) is None
+
+
+def test_ler_pedido_valido(tmp_path):
+    import rodar as r
+    (tmp_path / r.ARQ_PEDIDO).write_text('{"id": 7, "forcar": true, "por": "x"}')
+    assert r.ler_pedido(tmp_path) == {"id": 7, "forcar": True, "por": "x"}
