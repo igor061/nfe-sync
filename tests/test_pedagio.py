@@ -8,6 +8,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -328,7 +329,7 @@ def test_ac6_trigger_nao_cruza_canal_da_ciencia(db):
         assert list(ouvinte.notifies(timeout=1)) == []
 
 
-# ---------- AC7: gatilho.atender_consultas ----------
+# ---------- AC7: gatilho.atender_consultas (entrega o pedido a unidade agendada; nao roda rodar.py) ----------
 
 @pytest.fixture
 def gat(db, tmp_path, monkeypatch):
@@ -339,14 +340,8 @@ def gat(db, tmp_path, monkeypatch):
     (raiz / "DROCER").mkdir(parents=True)
     chamadas = []
 
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, **kw):  # o gatilho nao deve mais rodar nada por conta propria
         chamadas.append((cmd, kw))
-        import psycopg
-        if kw["env"].get("FAKE_GRAVA", "1") == "1" and "rodar.py" in cmd[-1]:
-            with psycopg.connect(db, autocommit=True) as con:
-                con.execute("insert into nfe.consultas_status (cnpj_interessado, empresa, rodada_em, consultado_em, cstat, motivo) "
-                            "values (%s,'DROCER',now(),now(),'137','Nenhum documento') on conflict (cnpj_interessado) do update "
-                            "set consultado_em = now(), cstat = '137', motivo = 'Nenhum documento'", (CNPJ,))
         return subprocess.CompletedProcess(cmd, 0)
     monkeypatch.setattr(gatilho.subprocess, "run", fake_run)
     return emp, raiz, chamadas
@@ -367,7 +362,22 @@ def _atende(db, gat_, cnpj=None):
         gatilho.atender_consultas(con, cnpj, emp, raiz)
 
 
-def test_ac7_sem_forcar_com_cooldown_ativo_vira_erro_sem_rodar_cli(db, gat):
+def _arq(raiz):
+    return raiz / "DROCER" / rodar.ARQ_PEDIDO
+
+
+def _conclui(db, minutos=0):
+    """Simula o rodar.py ter marcado o(s) pedido(s) como feito ha <minutos> min."""
+    q(db, "update nfe.pedidos_consulta set status='feito', processado_em = now() - make_interval(mins => %s) "
+          "where status = 'pendente'", minutos)
+
+
+def _envelhece(arq, minutos):
+    t = time.time() - minutos * 60
+    os.utime(arq, (t, t))
+
+
+def test_ac7_sem_forcar_com_cooldown_ativo_vira_erro_sem_arquivo(db, gat):
     emp, raiz, chamadas = gat
     ate = _futuro(90)
     _grava_cooldown(raiz / "DROCER", ate)
@@ -375,99 +385,94 @@ def test_ac7_sem_forcar_com_cooldown_ativo_vira_erro_sem_rodar_cli(db, gat):
     _atende(db, gat)
     hhmm = datetime.fromisoformat(ate).astimezone(rodar._BRT).strftime("%H:%M")
     assert _pedido_row(db) == [("erro", None, f"em espera até {hhmm}", True)]
-    assert chamadas == []
+    assert chamadas == [] and not _arq(raiz).exists()
 
 
-def test_ac7_sem_cooldown_roda_e_marca_feito_com_cstat_e_mensagem(db, gat):
+def test_ac1_pedido_valido_grava_arquivo_e_nao_roda_nem_marca(db, gat):
     emp, raiz, chamadas = gat
     _pedir(db, quem="ana")
     _atende(db, gat)
-    assert _pedido_row(db) == [("feito", "137", "Nenhum documento", True)]
-    (cmd, kw), = chamadas
-    assert cmd[-1].endswith("rodar.py")
-    assert "NFE_FORCAR" not in kw["env"] and "NFE_MODO" not in kw["env"]
-    assert kw["env"]["NFE_SOLICITADO_POR"] == "ana"
-    assert kw["env"]["NFE_DATA_DIR"] == str(raiz / "DROCER") and kw["env"]["NFE_EMPRESA"] == "DROCER"
+    pid = q(db, "select id from nfe.pedidos_consulta")[0][0]
+    assert json.loads(_arq(raiz).read_text()) == {"id": pid, "forcar": False, "por": "ana"}
+    assert chamadas == []                                          # nao roda rodar.py
+    assert _pedido_row(db) == [("pendente", None, None, False)]    # quem marca e o rodar.py
+    assert not list((raiz / "DROCER").glob("*.tmp"))               # gravacao atomica: sem .tmp sobrando
 
 
-def test_ac7_cooldown_vencido_nao_bloqueia(db, gat):
+def test_ac1_cooldown_vencido_nao_bloqueia(db, gat):
     emp, raiz, chamadas = gat
     _grava_cooldown(raiz / "DROCER", _futuro(-5))
     _pedir(db)
     _atende(db, gat)
-    assert _pedido_row(db)[0][0] == "feito" and len(chamadas) == 1
+    assert _arq(raiz).exists() and _pedido_row(db)[0][0] == "pendente"
 
 
-def test_ac7_forcar_roda_com_nfe_forcar_mesmo_com_cooldown(db, gat, monkeypatch):
+def test_ac1_forcar_com_cooldown_grava_arquivo_com_forcar_e_por(db, gat):
     emp, raiz, chamadas = gat
-    monkeypatch.setenv("NFE_MODO", "pedidos")                    # herdado do ambiente: deve ser removido
     _grava_cooldown(raiz / "DROCER", _futuro(90))
     _pedir(db, forcar=True, quem="bia")
     _atende(db, gat)
-    (cmd, kw), = chamadas
-    assert kw["env"]["NFE_FORCAR"] == "1" and kw["env"]["NFE_SOLICITADO_POR"] == "bia"
-    assert "NFE_MODO" not in kw["env"]
-    assert _pedido_row(db)[0][0] == "feito"
+    pid = q(db, "select id from nfe.pedidos_consulta")[0][0]
+    assert json.loads(_arq(raiz).read_text()) == {"id": pid, "forcar": True, "por": "bia"}
+    assert chamadas == [] and _pedido_row(db)[0][0] == "pendente"
 
 
-def test_ac7_rodada_sem_consulta_vira_erro_com_rc(db, gat, monkeypatch):
+def test_ac2_mesmo_id_recente_pula_sem_reescrever_nem_marcar(db, gat):
     emp, raiz, chamadas = gat
-    monkeypatch.setenv("FAKE_GRAVA", "0")
     _pedir(db)
     _atende(db, gat)
-    assert _pedido_row(db) == [("erro", None, "rodada sem consulta (rc=0)", True)]
+    arq = _arq(raiz)
+    pid = json.loads(arq.read_text())["id"]
+    arq.write_text(json.dumps({"id": pid, "forcar": False, "por": "marca-original"}))  # marca p/ detectar reescrita
+    _envelhece(arq, 19)
+    m0 = arq.stat().st_mtime
+    _atende(db, gat)
+    assert json.loads(arq.read_text())["por"] == "marca-original" and arq.stat().st_mtime == m0
+    assert _pedido_row(db) == [("pendente", None, None, False)] and chamadas == []
 
 
-def test_ac7_status_antigo_nao_conta_como_feito(db, gat, monkeypatch):
+def test_ac3_mesmo_id_com_20min_vira_erro_e_apaga_arquivo(db, gat):
     emp, raiz, chamadas = gat
-    monkeypatch.setenv("FAKE_GRAVA", "0")
-    q(db, "insert into nfe.consultas_status (cnpj_interessado, empresa, rodada_em, consultado_em, cstat) "
-          "values (%s,'D',now() - interval '1 hour', now() - interval '1 hour','137')", CNPJ)
     _pedir(db)
     _atende(db, gat)
-    assert _pedido_row(db)[0][0] == "erro"
-
-
-def test_ac7_bloqueio_surgido_durante_a_rodada_vira_erro_em_espera(db, gat, monkeypatch):
-    emp, raiz, chamadas = gat
-    monkeypatch.setenv("FAKE_GRAVA", "0")
-    q(db, "insert into nfe.consultas_status (cnpj_interessado, empresa, rodada_em, consultado_em, bloqueado_ate) "
-          "values (%s,'D',now() - interval '1 hour', now() - interval '1 hour', now() + interval '1 hour')", CNPJ)
-    _pedir(db)
+    _envelhece(_arq(raiz), 20)
     _atende(db, gat)
-    st, _, msg, _ = _pedido_row(db)[0]
-    assert st == "erro" and msg.startswith("em espera até ")
+    assert _pedido_row(db) == [("erro", None, "rodada não concluiu o pedido; tente de novo", True)]
+    assert not _arq(raiz).exists() and chamadas == []
 
 
-def test_ac7_cnpj_sem_instancia_vira_erro(db, gat):
+def test_ac3_id_diferente_no_arquivo_e_sobrescrito_sem_marcar_o_novo(db, gat):
+    emp, raiz, chamadas = gat
+    _arq(raiz).write_text(json.dumps({"id": 999999, "forcar": False, "por": "velho"}))
+    _envelhece(_arq(raiz), 60)
+    _pedir(db, quem="nova")
+    _atende(db, gat)
+    assert json.loads(_arq(raiz).read_text())["por"] == "nova"
+    assert _pedido_row(db) == [("pendente", None, None, False)]
+
+
+def test_ac4_cnpj_sem_instancia_vira_erro_sem_arquivo(db, gat):
+    emp, raiz, _ = gat
     _pedir(db, cnpj="99999999000199")
     _atende(db, gat)
     assert _pedido_row(db) == [("erro", None, "CNPJ sem instancia configurada", True)]
-
-
-def test_ac7_timeout_vira_erro(db, gat, monkeypatch):
-    def estoura(cmd, **kw):
-        raise subprocess.TimeoutExpired(cmd, 900)
-    monkeypatch.setattr(gatilho.subprocess, "run", estoura)
-    _pedir(db)
-    _atende(db, gat)
-    assert _pedido_row(db) == [("erro", None, "rodada passou de 15 min; abortada", True)]
+    assert not _arq(raiz).exists()
 
 
 def test_ac7_filtra_por_cnpj_e_ignora_nao_pendentes(db, gat):
     emp, raiz, chamadas = gat
     (emp / "BBB.env").write_text("NFE_EMPRESA=BBB\nNFE_CNPJ=99999999000199\nNFE_UF=df\n")
+    (raiz / "BBB").mkdir()
     _pedir(db)
     _pedir(db, cnpj="99999999000199")
     q(db, "insert into nfe.pedidos_consulta (cnpj_interessado, solicitado_por, status) values (%s,'x','feito')", CNPJ)
     _atende(db, gat, cnpj="99999999000199")
-    assert [r[0] for r in _pedido_row(db)] == ["pendente", "erro", "feito"] or len(chamadas) == 1
-    assert [c[1]["env"]["NFE_EMPRESA"] for c in chamadas] == ["BBB"]
-    assert _pedido_row(db)[0][0] == "pendente"                    # o da DROCER segue pendente
+    assert (raiz / "BBB" / rodar.ARQ_PEDIDO).exists() and not _arq(raiz).exists()   # so o CNPJ avisado
+    assert _pedido_row(db)[0][0] == "pendente"
     _atende(db, gat)                                              # varredura (None) pega o restante
-    assert _pedido_row(db)[0][0] != "pendente"
-    assert len(chamadas) == 2                                     # feito antigo nao foi reprocessado
+    assert _arq(raiz).exists()
     assert _pedido_row(db)[2] == ("feito", None, None, False)     # intacto (sem processado_em/mensagem)
+    assert chamadas == []
 
 
 # ---------- AC8 ----------
@@ -534,34 +539,151 @@ def _processado_ha(db, minutos):
     q(db, "update nfe.pedidos_consulta set processado_em = now() - make_interval(mins => %s)", minutos)
 
 
-def test_b1_segundo_forcar_em_30min_recusado_sem_rodar(db, gat):
+def test_b1_segundo_forcar_em_30min_recusado_sem_arquivo(db, gat):
     emp, raiz, chamadas = gat
     _pedir(db, forcar=True)
     _atende(db, gat)
+    _conclui(db)
+    _arq(raiz).unlink()                                           # a rodada ja consumiu o arquivo
     _processado_ha(db, 5)
     _pedir(db, forcar=True)
     _atende(db, gat)
     linhas = _pedido_row(db)
     assert linhas[0][0] == "feito"
     assert linhas[1][0] == "erro" and linhas[1][2].startswith("consulta forçada recentemente; tente após ")
-    assert len(chamadas) == 1
+    assert not _arq(raiz).exists()
 
 
-def test_b1_forcar_apos_30min_roda(db, gat):
+def test_b1_forcar_apos_30min_grava_arquivo(db, gat):
     emp, raiz, chamadas = gat
     _pedir(db, forcar=True)
     _atende(db, gat)
-    _processado_ha(db, 31)
+    _conclui(db, minutos=31)
+    _arq(raiz).unlink()
     _pedir(db, forcar=True)
     _atende(db, gat)
-    assert [r[0] for r in _pedido_row(db)] == ["feito", "feito"] and len(chamadas) == 2
+    assert [r[0] for r in _pedido_row(db)] == ["feito", "pendente"] and _arq(raiz).exists()
 
 
 def test_b1_pedido_sem_forcar_nao_conta_no_limite(db, gat):
     emp, raiz, chamadas = gat
     _pedir(db)
     _atende(db, gat)
-    _processado_ha(db, 5)
+    _conclui(db, minutos=5)
+    _arq(raiz).unlink()
     _pedir(db, forcar=True)
     _atende(db, gat)
-    assert [r[0] for r in _pedido_row(db)] == ["feito", "feito"]
+    assert [r[0] for r in _pedido_row(db)] == ["feito", "pendente"] and _arq(raiz).exists()
+
+
+# ---------- Pedido de consulta entregue ao rodar.py (.pedido-consulta.json) ----------
+
+def _entrega(db, dados, forcar=False, por="ana", status="pendente"):
+    """Cria o pedido no banco e o arquivo que o gatilho gravaria. Devolve o id."""
+    pid = q(db, "insert into nfe.pedidos_consulta (cnpj_interessado, solicitado_por, forcar, status) "
+                "values (%s,%s,%s,%s) returning id", CNPJ, por, forcar, status)[0][0]
+    (dados / rodar.ARQ_PEDIDO).write_text(json.dumps({"id": pid, "forcar": forcar, "por": por}))
+    return pid
+
+
+def _pedido_de(db, pid):
+    return q(db, "select status, cstat, mensagem, processado_em is not null from nfe.pedidos_consulta where id = %s", pid)[0]
+
+
+def test_ac5_feito_com_cstat_e_motivo_e_apaga_arquivo(amb, db, capsys):
+    dados, roda = amb
+    pid = _entrega(db, dados)
+    roda(OK137)
+    assert _pedido_de(db, pid) == ("feito", "137", "Nenhum documento localizado", True)
+    assert not (dados / rodar.ARQ_PEDIDO).exists()
+    assert f"Pedido de consulta {pid} -> feito" in capsys.readouterr().out
+
+
+def test_ac5_forcar_remove_cooldown_e_loga(amb, db, capsys):
+    dados, roda = amb
+    _grava_cooldown(dados, _futuro(90))
+    _entrega(db, dados, forcar=True, por="bia")
+    roda(OK137)
+    assert f"{CNPJ}:producao" not in roda.reg()["cooldown_ao_iniciar"]   # o CLI ja viu o cooldown removido
+    assert "FORÇADO: cooldown removido a pedido de bia" in capsys.readouterr().out
+
+
+def test_ac5_sem_forcar_mantem_cooldown_e_nao_loga(amb, db, capsys):
+    dados, roda = amb
+    _grava_cooldown(dados, _futuro(90))
+    _entrega(db, dados, forcar=False)
+    roda(OK137)
+    assert f"{CNPJ}:producao" in roda.reg()["cooldown_ao_iniciar"]
+    assert "FORÇADO" not in capsys.readouterr().out
+
+
+def test_ac5_bloqueado_vira_erro_em_espera(amb, db):
+    dados, roda = amb
+    pid = _entrega(db, dados)
+    ate = _futuro(30)
+    roda("BLOQUEADO: cooldown", rc=1, cooldown=ate)
+    hhmm = datetime.fromisoformat(ate).astimezone(rodar._BRT).strftime("%H:%M")
+    assert _pedido_de(db, pid) == ("erro", None, f"em espera até {hhmm}", True)
+    assert not (dados / rodar.ARQ_PEDIDO).exists()
+
+
+def test_ac5_sem_status_vira_erro_com_rc(amb, db):
+    dados, roda = amb
+    pid = _entrega(db, dados)
+    roda("", rc=3)
+    assert _pedido_de(db, pid) == ("erro", None, "rodada sem consulta (rc=3)", True)
+    assert not (dados / rodar.ARQ_PEDIDO).exists()
+
+
+def test_ac5_so_marca_pedido_ainda_pendente(amb, db):
+    dados, roda = amb
+    pid = _entrega(db, dados, status="erro")                      # ja encerrado (ex.: gatilho venceu em 20 min)
+    q(db, "update nfe.pedidos_consulta set mensagem = 'original' where id = %s", pid)
+    roda(OK137)
+    assert _pedido_de(db, pid) == ("erro", None, "original", False)
+    assert not (dados / rodar.ARQ_PEDIDO).exists()
+
+
+def test_ac6_modo_pedidos_ignora_arquivo(amb, db, monkeypatch, capsys):
+    dados, roda = amb
+    monkeypatch.setenv("NFE_MODO", "pedidos")
+    monkeypatch.setattr(rodar, "ha_pedidos_a_fazer", lambda *a: True)
+    _grava_cooldown(dados, _futuro(90))
+    pid = _entrega(db, dados, forcar=True)
+    with pytest.raises(SystemExit):
+        rodar.main()
+    assert (dados / rodar.ARQ_PEDIDO).exists()
+    assert _pedido_de(db, pid)[0] == "pendente"
+    assert json.loads((dados / ".state.json").read_text())["cooldown"].get(f"{CNPJ}:producao")
+    assert "FORÇADO" not in capsys.readouterr().out
+
+
+def test_ac7_excecao_em_concluir_pedido_nao_impede_gravar(amb, db, monkeypatch, capsys):
+    dados, roda = amb
+    gravados = []
+    monkeypatch.setattr(rodar, "gravar", lambda *a: gravados.append(a) or {})
+    monkeypatch.setattr(rodar, "concluir_pedido", lambda *a: (_ for _ in ()).throw(RuntimeError("boom")))
+    _entrega(db, dados)
+    roda(OK137)
+    assert len(gravados) == 1
+    assert "ERRO ao concluir pedido de consulta" in capsys.readouterr().out
+
+
+def test_ac8_unit_path_aponta_arquivo_e_servico():
+    txt = (RAIZ / "servico" / "nfe-sync-pedido@.path").read_text()
+    linhas = [x.strip() for x in txt.splitlines()]
+    assert "PathChanged=/opt/porv/nfe-sync/data/%i/.pedido-consulta.json" in linhas
+    assert "Unit=nfe-sync@%i.service" in linhas
+
+
+@pytest.mark.parametrize("conteudo", ["[1]", '"x"', '{"id": "7"}', "{}", "{quebrado"])
+def test_ler_pedido_ignora_arquivo_que_nao_e_pedido(tmp_path, conteudo):
+    import rodar as r
+    (tmp_path / r.ARQ_PEDIDO).write_text(conteudo)
+    assert r.ler_pedido(tmp_path) is None
+
+
+def test_ler_pedido_valido(tmp_path):
+    import rodar as r
+    (tmp_path / r.ARQ_PEDIDO).write_text('{"id": 7, "forcar": true, "por": "x"}')
+    assert r.ler_pedido(tmp_path) == {"id": 7, "forcar": True, "por": "x"}

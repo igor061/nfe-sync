@@ -205,6 +205,35 @@ def ha_pedidos_a_fazer(cnpj: str, db_url: str) -> bool:
             (cnpj, MAX_BUSCAS)).fetchone()[0]
 
 
+ARQ_PEDIDO = ".pedido-consulta.json"  # pedido de "Consultar agora" entregue pelo gatilho
+
+
+def ler_pedido(dados: Path):
+    """Pedido de consulta entregue pelo gatilho ({id, forcar, por}) ou None."""
+    try:
+        pedido = json.loads((dados / ARQ_PEDIDO).read_text())
+    except (OSError, ValueError):
+        return None
+    return pedido if isinstance(pedido, dict) and isinstance(pedido.get("id"), int) else None
+
+
+def concluir_pedido(dados: Path, pedido: dict, rc_info: tuple, db_url: str):
+    """Marca o pedido feito/erro conforme o resultado desta rodada e apaga o arquivo."""
+    rc, info = rc_info
+    if "Status" in info and "BLOQUEADO" not in info:
+        status, cstat, msg = "feito", info["Status"], info.get("Motivo")
+    elif "BLOQUEADO" in info:
+        ate = cooldown_ate(dados, os.environ["NFE_CNPJ"])
+        status, cstat, msg = "erro", None, f"em espera até {ate.astimezone(_BRT):%H:%M}" if ate else "em espera"
+    else:
+        status, cstat, msg = "erro", None, f"rodada sem consulta (rc={rc})"
+    with psycopg.connect(db_url, autocommit=True) as con:
+        con.execute("update nfe.pedidos_consulta set status = %s, cstat = %s, mensagem = %s, processado_em = now() "
+                    "where id = %s and status = 'pendente'", (status, cstat, msg, pedido["id"]))
+    (dados / ARQ_PEDIDO).unlink(missing_ok=True)
+    print(f"Pedido de consulta {pedido['id']} -> {status}: {msg}", flush=True)
+
+
 def cooldown_ate(dados: Path, cnpj: str):
     """Fim do cooldown (datetime com fuso) deste CNPJ no .state.json, ou None se nao ha/ja passou."""
     try:
@@ -300,14 +329,20 @@ def main():
         baixadas = baixar_completas_pedidas(empresa, cnpj, dados, env, os.environ["NFE_DB_URL"])
         if baixadas:
             print(f"XML completo pedido pela chave: {baixadas}", flush=True)
-        if os.environ.get("NFE_FORCAR") == "1" and not so_pedidos:
-            remover_cooldown(dados, cnpj, os.environ.get("NFE_SOLICITADO_POR", "?"))
+        pedido = None if so_pedidos else ler_pedido(dados)
+        if not so_pedidos and (os.environ.get("NFE_FORCAR") == "1" or (pedido and pedido.get("forcar"))):
+            remover_cooldown(dados, cnpj, (pedido or {}).get("por") or os.environ.get("NFE_SOLICITADO_POR", "?"))
         rc, info = (0, {}) if so_pedidos else consultar_nsu(empresa, dados, env)
         if not so_pedidos:
             try:
                 gravar_status(empresa, cnpj, dados, (rc, info), os.environ["NFE_DB_URL"])
             except Exception as e:  # status e acessorio: nao pode impedir a gravacao dos XMLs
                 print(f"ERRO ao gravar consultas_status: {type(e).__name__}: {e}", flush=True)
+            if pedido:
+                try:
+                    concluir_pedido(dados, pedido, (rc, info), os.environ["NFE_DB_URL"])
+                except Exception as e:  # idem: o gatilho vence o pedido em 20 min
+                    print(f"ERRO ao concluir pedido de consulta: {type(e).__name__}: {e}", flush=True)
     cont = gravar(dados / "downloads" / cnpj, cnpj, os.environ["NFE_DB_URL"])
     print(f"Banco: {cont}", flush=True)
     sys.exit(rc or (1 if cont.get("erro") else 0))

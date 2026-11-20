@@ -555,7 +555,7 @@ def test_trava_real_serializa_rodadas_da_mesma_empresa(tmp_path):
 
 # loop main do gatilho com Postgres real e rodar.py de mentira (grava env num log)
 
-STUB = ("_BRT = None\ncooldown_ate = lambda *a: None\nimport os,json\nif __name__ == '__main__':\n"
+STUB = ("_BRT = None\nARQ_PEDIDO = '.pedido-consulta.json'\ncooldown_ate = lambda *a: None\nler_pedido = lambda *a: None\nimport os,json\nif __name__ == '__main__':\n"
         "    open(os.environ['LOGF'],'a').write(json.dumps({k:os.environ.get(k) for k in "
         "('NFE_EMPRESA','NFE_MODO','NFE_DATA_DIR')})+'\\n')\n")
 
