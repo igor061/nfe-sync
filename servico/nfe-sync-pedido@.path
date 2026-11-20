@@ -1,0 +1,11 @@
+[Unit]
+Description=nfe-sync %i: "Consultar agora" da UI roda a propria unidade agendada
+
+[Path]
+# O gatilho grava o pedido aqui; rodar a unidade (e nao uma consulta avulsa) faz o
+# nfe-sync@%i.timer recomecar a contar 62 min a partir desta consulta.
+PathChanged=/opt/porv/nfe-sync/data/%i/.pedido-consulta.json
+Unit=nfe-sync@%i.service
+
+[Install]
+WantedBy=paths.target

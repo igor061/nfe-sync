@@ -3,9 +3,10 @@
 Para cada aviso (payload = CNPJ interessado), roda `rodar.py` em modo 'pedidos' para as
 instancias daquele CNPJ: registra a ciencia e baixa o XML completo pela chave. Varredura
 a cada 10 min cobre aviso perdido (reinicio, queda de conexao). O modo 'pedidos' nunca consulta por NSU;
-so o pedido de consulta (nfe.pedidos_consulta) roda a rodada normal da instancia, com o cooldown
-respeitado (ou removido, se forcar).
+o pedido de consulta (nfe.pedidos_consulta) e validado aqui e entregue a unidade agendada da
+instancia (arquivo .pedido-consulta.json + nfe-sync-pedido@.path), que consulta e marca feito/erro.
 """
+import json
 import os
 import select
 import subprocess
@@ -15,12 +16,13 @@ from pathlib import Path
 
 import psycopg
 
-from rodar import _BRT, cooldown_ate
+from rodar import _BRT, ARQ_PEDIDO, cooldown_ate
 
 CANAL = "nfe_pedidos_ciencia"
 CANAL_CONSULTA = "nfe_pedidos_consulta"
 VARREDURA_S = 600
 FORCAR_INTERVALO_MIN = 30  # no maximo uma consulta forcada a cada 30 min por CNPJ
+PEDIDO_PRAZO_S = 20 * 60  # pedido entregue a unidade e nao concluido nesse prazo vira erro
 
 
 def ler_env(arquivo: Path) -> dict:
@@ -73,22 +75,25 @@ def atender_consultas(con, cnpj: str | None, dir_empresas: Path, raiz_dados: Pat
         elif (ate := None if forcar else cooldown_ate(raiz_dados / insts[0][0], c)):
             msg = f"em espera até {ate.astimezone(_BRT):%H:%M}"
         else:
-            nome, emp = insts[0]
-            t0 = con.execute("select now()").fetchone()[0]
-            env = {**os.environ, **emp, "NFE_DATA_DIR": str(raiz_dados / nome), "NFE_SOLICITADO_POR": quem,
-                   **({"NFE_FORCAR": "1"} if forcar else {})}
-            env.pop("NFE_MODO", None)
+            # A consulta roda na propria unidade agendada (nfe-sync@<inst>.service, disparada pelo
+            # nfe-sync-pedido@<inst>.path): assim o timer recomeca a contar 62 min a partir dela.
+            nome = insts[0][0]
+            arq = raiz_dados / nome / ARQ_PEDIDO
             try:
-                rc = subprocess.run([sys.executable, str(Path(__file__).with_name("rodar.py"))], env=env,
-                                    stdin=subprocess.DEVNULL, timeout=900).returncode
-                st = con.execute("select consultado_em, cstat, motivo, bloqueado_ate > now(), to_char(bloqueado_ate at time zone "
-                                 "'America/Sao_Paulo', 'HH24:MI') from nfe.consultas_status where cnpj_interessado = %s", (c,)).fetchone()
-                if st and st[0] and st[0] >= t0:
-                    status, cstat, msg = "feito", st[1], st[2]
-                else:
-                    msg = f"em espera até {st[4]}" if st and st[3] else f"rodada sem consulta (rc={rc})"
-            except subprocess.TimeoutExpired:
-                msg = "rodada passou de 15 min; abortada"
+                atual = json.loads(arq.read_text())
+            except (OSError, ValueError):
+                atual = None
+            if atual and atual.get("id") == pid and time.time() - arq.stat().st_mtime < PEDIDO_PRAZO_S:
+                continue  # ja entregue a unidade; o rodar.py marca feito/erro
+            if atual and atual.get("id") == pid:
+                arq.unlink(missing_ok=True)
+                msg = "rodada não concluiu o pedido; tente de novo"
+            else:
+                tmp = arq.with_suffix(".tmp")
+                tmp.write_text(json.dumps({"id": pid, "forcar": bool(forcar), "por": quem}))
+                tmp.replace(arq)
+                print(f"gatilho: pedido de consulta {pid} ({c}) entregue a nfe-sync@{nome}", flush=True)
+                continue
         print(f"gatilho: pedido de consulta {pid} ({c}) -> {status}: {msg}", flush=True)
         con.execute("update nfe.pedidos_consulta set status = %s, cstat = %s, mensagem = %s, processado_em = now() "
                     "where id = %s", (status, cstat, msg, pid))
