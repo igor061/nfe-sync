@@ -6,6 +6,7 @@ a cada 10 min cobre aviso perdido (reinicio, queda de conexao). O modo 'pedidos'
 o pedido de consulta (nfe.pedidos_consulta) e validado aqui e entregue a unidade agendada da
 instancia (arquivo .pedido-consulta.json + nfe-sync-pedido@.path), que consulta e marca feito/erro.
 """
+import json
 import os
 import select
 import subprocess
