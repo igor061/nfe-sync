@@ -211,9 +211,10 @@ ARQ_PEDIDO = ".pedido-consulta.json"  # pedido de "Consultar agora" entregue pel
 def ler_pedido(dados: Path):
     """Pedido de consulta entregue pelo gatilho ({id, forcar, por}) ou None."""
     try:
-        return json.loads((dados / ARQ_PEDIDO).read_text())
+        pedido = json.loads((dados / ARQ_PEDIDO).read_text())
     except (OSError, ValueError):
         return None
+    return pedido if isinstance(pedido, dict) and isinstance(pedido.get("id"), int) else None
 
 
 def concluir_pedido(dados: Path, pedido: dict, rc_info: tuple, db_url: str):

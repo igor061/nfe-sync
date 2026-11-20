@@ -6,7 +6,6 @@ a cada 10 min cobre aviso perdido (reinicio, queda de conexao). O modo 'pedidos'
 o pedido de consulta (nfe.pedidos_consulta) e validado aqui e entregue a unidade agendada da
 instancia (arquivo .pedido-consulta.json + nfe-sync-pedido@.path), que consulta e marca feito/erro.
 """
-import json
 import os
 import select
 import subprocess
@@ -16,7 +15,7 @@ from pathlib import Path
 
 import psycopg
 
-from rodar import _BRT, ARQ_PEDIDO, cooldown_ate
+from rodar import _BRT, ARQ_PEDIDO, cooldown_ate, ler_pedido
 
 CANAL = "nfe_pedidos_ciencia"
 CANAL_CONSULTA = "nfe_pedidos_consulta"
@@ -79,11 +78,12 @@ def atender_consultas(con, cnpj: str | None, dir_empresas: Path, raiz_dados: Pat
             # nfe-sync-pedido@<inst>.path): assim o timer recomeca a contar 62 min a partir dela.
             nome = insts[0][0]
             arq = raiz_dados / nome / ARQ_PEDIDO
+            atual = ler_pedido(arq.parent)
             try:
-                atual = json.loads(arq.read_text())
-            except (OSError, ValueError):
-                atual = None
-            if atual and atual.get("id") == pid and time.time() - arq.stat().st_mtime < PEDIDO_PRAZO_S:
+                idade = time.time() - arq.stat().st_mtime
+            except OSError:  # o rodar.py acabou de concluir e apagar
+                idade = 0
+            if atual and atual.get("id") == pid and idade < PEDIDO_PRAZO_S:
                 continue  # ja entregue a unidade; o rodar.py marca feito/erro
             if atual and atual.get("id") == pid:
                 arq.unlink(missing_ok=True)
